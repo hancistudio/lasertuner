@@ -26,61 +26,82 @@ class FirebaseService:
     def _initialize_firebase(self):
         """Initialize Firebase Admin SDK with credentials"""
         try:
-            # Check if already initialized
             if firebase_admin._apps:
                 self.db = firestore.client()
                 self.initialized = True
                 logger.info("✅ Firebase already initialized")
                 return
             
-            # Method 1: Environment Variables (Render.com)
+            # Method 1: Try multiple secret file paths
+            possible_paths = [
+                '/etc/secrets/serviceAccountKey.json',
+                'serviceAccountKey.json',
+                './serviceAccountKey.json',
+                os.path.join(os.getcwd(), 'serviceAccountKey.json'),
+            ]
+            
+            for cred_path in possible_paths:
+                if os.path.exists(cred_path):
+                    logger.info(f"🔍 Found credentials at: {cred_path}")
+                    cred = credentials.Certificate(cred_path)
+                    firebase_admin.initialize_app(cred)
+                    self.db = firestore.client()
+                    self.initialized = True
+                    logger.info(f"✅ Firebase initialized from {cred_path}")
+                    return
+            
+            # Method 2: Environment Variables
             project_id = os.getenv('FIREBASE_PROJECT_ID')
             private_key = os.getenv('FIREBASE_PRIVATE_KEY')
             client_email = os.getenv('FIREBASE_CLIENT_EMAIL')
             
-            if project_id and private_key and client_email:
-                # Private key formatını düzelt (\\n → \n)
-                private_key = private_key.replace('\\n', '\n')
-                
-                cred = credentials.Certificate({
-                    "type": "service_account",
-                    "project_id": project_id,
-                    "private_key": private_key,
-                    "client_email": client_email,
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                })
-                
-                firebase_admin.initialize_app(cred)
-                self.db = firestore.client()
-                self.initialized = True
-                logger.info(f"✅ Firebase initialized with env vars for {project_id}")
-                return
-            
-            # Method 2: Service Account File (local development)
-            cred_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-            if cred_path and os.path.exists(cred_path):
-                cred = credentials.Certificate(cred_path)
-                firebase_admin.initialize_app(cred)
-                self.db = firestore.client()
-                self.initialized = True
-                logger.info("✅ Firebase initialized from service account file")
-                return
-            
-            # Method 3: Default credentials (fallback)
-            project_id_fallback = os.getenv('FIREBASE_PROJECT_ID', 'lasertuner-59b92')
-            if project_id_fallback:
-                firebase_admin.initialize_app(options={
-                    'projectId': project_id_fallback,
-                })
-                self.db = firestore.client()
-                self.initialized = True
-                logger.info(f"✅ Firebase initialized with default credentials for {project_id_fallback}")
-                return
+            if project_id and client_email:
+                # Eğer private_key JSON string ise
+                try:
+                    import json
+                    cred_dict = json.loads(private_key) if private_key else {}
+                    
+                    if 'private_key' in cred_dict:
+                        # Tam JSON verildi
+                        cred = credentials.Certificate(cred_dict)
+                    else:
+                        # Sadece key değerleri verildi
+                        cred = credentials.Certificate({
+                            "type": "service_account",
+                            "project_id": project_id,
+                            "private_key": private_key.replace('\\n', '\n') if private_key else '',
+                            "client_email": client_email,
+                            "token_uri": "https://oauth2.googleapis.com/token",
+                        })
+                    
+                    firebase_admin.initialize_app(cred)
+                    self.db = firestore.client()
+                    self.initialized = True
+                    logger.info(f"✅ Firebase initialized with env vars for {project_id}")
+                    return
+                except json.JSONDecodeError:
+                    # Private key doğrudan string
+                    if private_key and client_email:
+                        cred = credentials.Certificate({
+                            "type": "service_account",
+                            "project_id": project_id,
+                            "private_key": private_key.replace('\\n', '\n'),
+                            "client_email": client_email,
+                            "token_uri": "https://oauth2.googleapis.com/token",
+                        })
+                        
+                        firebase_admin.initialize_app(cred)
+                        self.db = firestore.client()
+                        self.initialized = True
+                        logger.info(f"✅ Firebase initialized with env vars for {project_id}")
+                        return
             
             logger.warning("⚠️ Firebase not initialized - no credentials found")
+            logger.warning(f"⚠️ Checked paths: {possible_paths}")
             
         except Exception as e:
             logger.error(f"❌ Firebase initialization error: {e}")
+            logger.exception("Full error:")
             self.initialized = False
     
     def is_available(self) -> bool:
