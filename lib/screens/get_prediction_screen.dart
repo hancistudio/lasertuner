@@ -6,7 +6,7 @@ import '../models/experiment_model.dart';
 import '../widgets/custom_button.dart';
 
 class GetPredictionScreen extends StatefulWidget {
-  const GetPredictionScreen({Key? key}) : super(key: key);
+  const GetPredictionScreen({super.key});
 
   @override
   State<GetPredictionScreen> createState() => _GetPredictionScreenState();
@@ -15,7 +15,7 @@ class GetPredictionScreen extends StatefulWidget {
 class _GetPredictionScreenState extends State<GetPredictionScreen>
     with SingleTickerProviderStateMixin {
   // API URL - Render deploy sonrası buraya gerçek URL'i koy
-  static const String API_URL = 'https://YOUR-RENDER-APP.onrender.com';
+  static const String API_URL = 'https://lasertuner-ml-api.onrender.com';
 
   final TextEditingController _machineBrandController = TextEditingController();
   final TextEditingController _laserPowerController = TextEditingController();

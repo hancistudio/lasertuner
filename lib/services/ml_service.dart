@@ -5,7 +5,7 @@ import '../models/prediction_model.dart';
 
 class MLService {
   // Render URL'inizi buraya koyun (deploy sonrası)
-  static const String API_URL = 'https://YOUR-RENDER-APP.onrender.com';
+  static const String API_URL = 'https://lasertuner-ml-api.onrender.com';
 
   // Timeout süreleri
   static const Duration connectionTimeout = Duration(seconds: 10);
