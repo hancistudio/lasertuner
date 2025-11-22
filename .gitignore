@@ -70,4 +70,4 @@ logs/
 # Database
 *.db
 *.sqlite
-*.sqlite3
+*.sqlite3backend/serviceAccountKey.json
