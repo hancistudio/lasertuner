@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../models/prediction_model.dart';
 import '../models/experiment_model.dart';
 import '../services/ml_service.dart';
