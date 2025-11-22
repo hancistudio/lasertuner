@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "51339030477",
+    "project_id": "lasertuner-59b92",
+    "storage_bucket": "lasertuner-59b92.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:51339030477:android:a0338da0ad33c2a172de84",
+        "android_client_info": {
+          "package_name": "com.example.lasertuner"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBshLk9QV9WY9TPUlYwt43h2P_pnhYnuVU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

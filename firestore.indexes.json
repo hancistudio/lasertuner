@@ -1,0 +1,33 @@
+{
+    "indexes": [
+      {
+        "collectionGroup": "laser_data",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "isApproved",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "createdAt",
+            "order": "DESCENDING"
+          }
+        ]
+      },
+      {
+        "collectionGroup": "laser_data",
+        "queryScope": "COLLECTION",
+        "fields": [
+          {
+            "fieldPath": "userId",
+            "order": "ASCENDING"
+          },
+          {
+            "fieldPath": "createdAt",
+            "order": "DESCENDING"
+          }
+        ]
+      }
+    ],
+    "fieldOverrides": []
+  }
