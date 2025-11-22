@@ -673,30 +673,40 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
   }
 
   Widget _buildPredictionResults(bool isDark, bool isLarge) {
+    final result = _predictionResult!;
+
     return Card(
       elevation: 4,
       color: isDark ? Colors.grey.shade900 : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.green.shade300, width: 2),
+        side: BorderSide(
+          color:
+              result.dataSource == 'user_data'
+                  ? Colors.green.shade300
+                  : result.dataSource == 'hybrid'
+                  ? Colors.orange.shade300
+                  : Colors.grey.shade300,
+          width: 2,
+        ),
       ),
       child: Padding(
         padding: EdgeInsets.all(isLarge ? 24 : 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Başlık
+            // ✨ YENİ: Başlık ve Veri Kaynağı Badge
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.1),
+                    color: result.getDataSourceColor().withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.check_circle,
-                    color: Colors.green,
+                    color: result.getDataSourceColor(),
                     size: 32,
                   ),
                 ),
@@ -713,15 +723,28 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                           color: isDark ? Colors.white : Colors.black87,
                         ),
                       ),
-                      Text(
-                        '${_predictionResult!.predictions.length} işlem için parametre',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color:
-                              isDark
-                                  ? Colors.grey.shade400
-                                  : Colors.grey.shade600,
-                        ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            result.getDataSourceIcon(),
+                            size: 16,
+                            color: result.getDataSourceColor(),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              result.getDataSourceDescription(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color:
+                                    isDark
+                                        ? Colors.grey.shade400
+                                        : Colors.grey.shade600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -730,31 +753,39 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
             ),
             const SizedBox(height: 20),
 
-            // Güven skoru
+            // ✨ YENİ: Veri Kaynağı Bilgi Kartı
+            _buildDataSourceCard(result, isDark, isLarge),
+            const SizedBox(height: 20),
+
+            // Güven skoru (mevcut)
             _buildConfidenceScore(isDark, isLarge),
             const SizedBox(height: 20),
 
-            // Her işlem için parametreler
-            ..._predictionResult!.predictions.entries.map((entry) {
+            // İşlem parametreleri (mevcut)
+            ...result.predictions.entries.map((entry) {
               return _buildProcessResult(entry, isDark, isLarge);
             }).toList(),
 
-            // Notlar
-            if (_predictionResult!.notes.isNotEmpty) ...[
+            // Notlar (güncellenmiş)
+            if (result.notes.isNotEmpty) ...[
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color:
-                      _predictionResult!.confidenceScore >= 0.7
-                          ? Colors.blue.shade50
-                          : Colors.orange.shade50,
+                      result.dataSource == 'user_data'
+                          ? Colors.green.shade50
+                          : result.dataSource == 'hybrid'
+                          ? Colors.orange.shade50
+                          : Colors.grey.shade50,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color:
-                        _predictionResult!.confidenceScore >= 0.7
-                            ? Colors.blue.shade200
-                            : Colors.orange.shade200,
+                        result.dataSource == 'user_data'
+                            ? Colors.green.shade200
+                            : result.dataSource == 'hybrid'
+                            ? Colors.orange.shade200
+                            : Colors.grey.shade200,
                   ),
                 ),
                 child: Row(
@@ -763,19 +794,24 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                     Icon(
                       Icons.info_outline,
                       color:
-                          _predictionResult!.confidenceScore >= 0.7
-                              ? Colors.blue
-                              : Colors.orange,
+                          result.dataSource == 'user_data'
+                              ? Colors.green
+                              : result.dataSource == 'hybrid'
+                              ? Colors.orange
+                              : Colors.grey,
+                      size: 20,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        _predictionResult!.notes,
+                        result.notes,
                         style: TextStyle(
                           color:
-                              _predictionResult!.confidenceScore >= 0.7
-                                  ? Colors.blue.shade900
-                                  : Colors.orange.shade900,
+                              result.dataSource == 'user_data'
+                                  ? Colors.green.shade900
+                                  : result.dataSource == 'hybrid'
+                                  ? Colors.orange.shade900
+                                  : Colors.grey.shade900,
                           fontSize: 13,
                         ),
                       ),
@@ -786,6 +822,131 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  // ✨ YENİ: Veri Kaynağı Bilgi Kartı
+  Widget _buildDataSourceCard(
+    PredictionResponse result,
+    bool isDark,
+    bool isLarge,
+  ) {
+    Color cardColor;
+    IconData icon;
+    String title;
+    String description;
+
+    switch (result.dataSource) {
+      case 'user_data':
+        cardColor = Colors.green;
+        icon = Icons.groups;
+        title = '🎯 Topluluk Verisi Kullanıldı';
+        description =
+            '${result.dataPointsUsed} benzer deney verisinden öğrenildi. '
+            'Bu tahmin gerçek kullanıcı deneyimlerine dayanıyor!';
+        break;
+      case 'hybrid':
+        cardColor = Colors.orange;
+        icon = Icons.merge_type;
+        title = '🔀 Karma Tahmin';
+        description =
+            'Bazı işlemler için topluluk verisi (${result.dataPointsUsed} deney), '
+            'diğerleri için temel algoritma kullanıldı.';
+        break;
+      case 'static_algorithm':
+      default:
+        cardColor = Colors.grey;
+        icon = Icons.calculate;
+        title = '⚙️ Temel Algoritma';
+        description =
+            'Henüz yeterli topluluk verisi yok. '
+            'Siz de veri ekleyerek tahminlerin gelişmesine katkıda bulunabilirsiniz!';
+    }
+
+    return Container(
+      padding: EdgeInsets.all(isLarge ? 16 : 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [cardColor.withOpacity(0.1), cardColor.withOpacity(0.05)],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: cardColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: cardColor, size: isLarge ? 24 : 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: isLarge ? 16 : 14,
+                    fontWeight: FontWeight.bold,
+                    color: cardColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            description,
+            style: TextStyle(
+              fontSize: isLarge ? 13 : 12,
+              color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+              height: 1.4,
+            ),
+          ),
+          if (result.dataPointsUsed > 0) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildStatChip(
+                  Icons.science,
+                  '${result.dataPointsUsed} Deney',
+                  Colors.blue,
+                ),
+                if (result.confidenceScore >= 0.8)
+                  _buildStatChip(Icons.verified, 'Yüksek Güven', Colors.green),
+                if (result.notes.contains('gold standard'))
+                  _buildStatChip(Icons.star, 'Gold Standard', Colors.orange),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ✨ YENİ: Küçük İstatistik Chip'i
+  Widget _buildStatChip(IconData icon, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

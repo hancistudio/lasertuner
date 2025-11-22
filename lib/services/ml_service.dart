@@ -9,9 +9,7 @@ class MLService {
 
   // Timeout süreleri
   static const Duration connectionTimeout = Duration(seconds: 10);
-  static const Duration requestTimeout = Duration(
-    seconds: 30,
-  ); // Cold start için artırıldı
+  static const Duration requestTimeout = Duration(seconds: 30);
 
   /// API sağlık kontrolü
   Future<bool> checkHealth() async {
@@ -44,20 +42,6 @@ class MLService {
     } catch (e) {
       print('Statistics fetch error: $e');
       return null;
-    }
-  }
-
-  /// Manuel model eğitimi tetikle
-  Future<bool> trainModel() async {
-    try {
-      final response = await http
-          .post(Uri.parse('$API_URL/train'))
-          .timeout(requestTimeout);
-
-      return response.statusCode == 200;
-    } catch (e) {
-      print('Model training error: $e');
-      return false;
     }
   }
 
@@ -95,7 +79,6 @@ class MLService {
         final Map<String, dynamic> data = jsonDecode(response.body);
         return PredictionResponse.fromMap(data);
       } else if (response.statusCode == 422) {
-        // Validation error
         final errorData = jsonDecode(response.body);
         throw Exception('Geçersiz veri: ${errorData['detail']}');
       } else if (response.statusCode == 500) {
@@ -154,6 +137,8 @@ class MLService {
       notes:
           '⚠️ API bağlantısı kurulamadı, basit algoritma kullanıldı. '
           'İnternet bağlantınızı kontrol edin veya daha sonra tekrar deneyin.',
+      dataPointsUsed: 0, // ✨ EKLENDİ
+      dataSource: 'static_algorithm', // ✨ EKLENDİ
     );
   }
 
