@@ -1,0 +1,7 @@
+*.json
+!render.yaml
+__pycache__/
+*.py[cod]
+venv/
+.env
+*.log

@@ -4,23 +4,28 @@ import 'package:lasertuner/models/experiment_model.dart';
 import '../models/prediction_model.dart';
 
 class MLService {
-  // Render URL'inizi buraya koyun (deploy sonrası)
+  // ✅ RENDER.COM PRODUCTION URL
   static const String API_URL = 'https://lasertuner-ml-api.onrender.com';
 
   // Timeout süreleri
   static const Duration connectionTimeout = Duration(seconds: 10);
-  static const Duration requestTimeout = Duration(seconds: 15);
+  static const Duration requestTimeout = Duration(
+    seconds: 30,
+  ); // Cold start için artırıldı
 
   /// API sağlık kontrolü
   Future<bool> checkHealth() async {
     try {
+      print('🔍 Checking API health: $API_URL/health');
+
       final response = await http
           .get(Uri.parse('$API_URL/health'))
           .timeout(connectionTimeout);
 
+      print('✅ Health check response: ${response.statusCode}');
       return response.statusCode == 200;
     } catch (e) {
-      print('Health check failed: $e');
+      print('❌ Health check failed: $e');
       return false;
     }
   }
@@ -59,6 +64,9 @@ class MLService {
   /// Tahmin al
   Future<PredictionResponse> getPrediction(PredictionRequest request) async {
     try {
+      print('📤 Sending prediction request to: $API_URL/predict');
+      print('📦 Request data: ${jsonEncode(request.toMap())}');
+
       final response = await http
           .post(
             Uri.parse('$API_URL/predict'),
@@ -68,22 +76,43 @@ class MLService {
             },
             body: jsonEncode(request.toMap()),
           )
-          .timeout(requestTimeout);
+          .timeout(
+            requestTimeout,
+            onTimeout: () {
+              print('⏱️ Request timeout after ${requestTimeout.inSeconds}s');
+              throw Exception(
+                'İstek zaman aşımına uğradı. '
+                'API sunucusu ilk istekte soğuk başlangıç yapıyor olabilir. '
+                'Lütfen tekrar deneyin.',
+              );
+            },
+          );
+
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = jsonDecode(response.body);
         return PredictionResponse.fromMap(data);
+      } else if (response.statusCode == 422) {
+        // Validation error
+        final errorData = jsonDecode(response.body);
+        throw Exception('Geçersiz veri: ${errorData['detail']}');
+      } else if (response.statusCode == 500) {
+        throw Exception('Sunucu hatası. Lütfen daha sonra tekrar deneyin.');
       } else {
         throw Exception('API Error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      print('Prediction error: $e');
+      print('❌ Prediction error: $e');
       rethrow;
     }
   }
 
   /// Fallback: Basit tahmin (API çalışmazsa)
   PredictionResponse generateFallbackPrediction(PredictionRequest request) {
+    print('⚠️ Using fallback prediction algorithm');
+
     Map<String, ProcessParams> predictions = {};
     double thickness = request.materialThickness;
 
@@ -123,7 +152,8 @@ class MLService {
       predictions: predictions,
       confidenceScore: 0.5,
       notes:
-          '⚠️ Bu tahmin basit bir algoritmaya dayanıyor. ML servisi bağlantısı kurulamadı. Daha iyi sonuçlar için topluluk verilerinden öğrenen ML modelini kullanın.',
+          '⚠️ API bağlantısı kurulamadı, basit algoritma kullanıldı. '
+          'İnternet bağlantınızı kontrol edin veya daha sonra tekrar deneyin.',
     );
   }
 
@@ -135,6 +165,7 @@ class MLService {
     switch (material.toLowerCase()) {
       case 'ahşap':
       case 'ahsap':
+      case 'wood':
         basePower = 65;
         multiplier = 3.0;
         break;
@@ -144,14 +175,17 @@ class MLService {
         break;
       case 'plexiglass':
       case 'akrilik':
+      case 'acrylic':
         basePower = 55;
         multiplier = 2.5;
         break;
       case 'karton':
+      case 'cardboard':
         basePower = 35;
         multiplier = 2.0;
         break;
       case 'deri':
+      case 'leather':
         basePower = 40;
         multiplier = 1.5;
         break;
@@ -171,6 +205,7 @@ class MLService {
     switch (material.toLowerCase()) {
       case 'ahşap':
       case 'ahsap':
+      case 'wood':
         baseSpeed = 320;
         reduction = 18;
         break;
@@ -180,14 +215,17 @@ class MLService {
         break;
       case 'plexiglass':
       case 'akrilik':
+      case 'acrylic':
         baseSpeed = 380;
         reduction = 25;
         break;
       case 'karton':
+      case 'cardboard':
         baseSpeed = 450;
         reduction = 15;
         break;
       case 'deri':
+      case 'leather':
         baseSpeed = 400;
         reduction = 12;
         break;

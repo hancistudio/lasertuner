@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/prediction_model.dart';
 import '../models/experiment_model.dart';
+import '../services/ml_service.dart';
 import '../widgets/custom_button.dart';
 
 class GetPredictionScreen extends StatefulWidget {
@@ -14,9 +15,10 @@ class GetPredictionScreen extends StatefulWidget {
 
 class _GetPredictionScreenState extends State<GetPredictionScreen>
     with SingleTickerProviderStateMixin {
-  // API URL - Render deploy sonrası buraya gerçek URL'i koy
+  // ✅ RENDER.COM API URL
   static const String API_URL = 'https://lasertuner-ml-api.onrender.com';
 
+  final MLService _mlService = MLService();
   final TextEditingController _machineBrandController = TextEditingController();
   final TextEditingController _laserPowerController = TextEditingController();
   final TextEditingController _materialTypeController = TextEditingController();
@@ -24,6 +26,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
   bool _isLoading = false;
   bool _apiHealthy = false;
+  bool _isCheckingHealth = true;
   PredictionResponse? _predictionResult;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -39,6 +42,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     'Epilog Laser Fusion Pro',
     'Trotec Speedy 400',
     'Universal Laser Systems',
+    'Thunder Laser',
     'Diğer',
   ];
 
@@ -78,23 +82,46 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
   }
 
   Future<void> _checkApiHealth() async {
-    try {
-      final response = await http
-          .get(Uri.parse('$API_URL/health'))
-          .timeout(const Duration(seconds: 5));
+    setState(() => _isCheckingHealth = true);
 
-      if (response.statusCode == 200) {
-        setState(() => _apiHealthy = true);
+    try {
+      print('🔍 Checking API health...');
+      final isHealthy = await _mlService.checkHealth();
+
+      if (mounted) {
+        setState(() {
+          _apiHealthy = isHealthy;
+          _isCheckingHealth = false;
+        });
+
+        if (isHealthy) {
+          _showSnackBar(
+            '✅ ML servisi aktif ve hazır!',
+            backgroundColor: Colors.green,
+          );
+        } else {
+          _showSnackBar(
+            '⚠️ ML servisi yanıt vermiyor. Fallback mode aktif.',
+            backgroundColor: Colors.orange,
+          );
+        }
       }
     } catch (e) {
-      setState(() => _apiHealthy = false);
-      _showSnackBar(
-        '⚠️ ML servisi bağlantı hatası. Fallback mode kullanılacak.',
-      );
+      print('❌ Health check error: $e');
+      if (mounted) {
+        setState(() {
+          _apiHealthy = false;
+          _isCheckingHealth = false;
+        });
+        _showSnackBar(
+          '⚠️ API bağlantısı kurulamadı. Yerel tahmin kullanılacak.',
+          backgroundColor: Colors.orange,
+        );
+      }
     }
   }
 
-  Future<void> _getPrediction() async {
+  void _getPrediction() {
     // Validasyon
     if (_machineBrandController.text.isEmpty ||
         _laserPowerController.text.isEmpty ||
@@ -111,6 +138,11 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
     setState(() => _isLoading = true);
 
+    // Async işlemleri buradan başlat
+    _performPrediction();
+  }
+
+  Future<void> _performPrediction() async {
     try {
       List<String> selectedProcessList =
           _selectedProcesses.entries
@@ -118,92 +150,63 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               .map((entry) => entry.key)
               .toList();
 
-      final requestBody = {
-        'machineBrand': _machineBrandController.text,
-        'laserPower': double.parse(_laserPowerController.text),
-        'materialType': _materialTypeController.text,
-        'materialThickness': double.parse(_thicknessController.text),
-        'processes': selectedProcessList,
-      };
+      final request = PredictionRequest(
+        machineBrand: _machineBrandController.text,
+        laserPower: double.parse(_laserPowerController.text),
+        materialType: _materialTypeController.text,
+        materialThickness: double.parse(_thicknessController.text),
+        processes: selectedProcessList,
+      );
 
-      // API'ye istek gönder
-      final response = await http
-          .post(
-            Uri.parse('$API_URL/predict'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(requestBody),
-          )
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw Exception('İstek zaman aşımına uğradı');
-            },
-          );
+      PredictionResponse response;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+      // API'yi dene, başarısız olursa fallback kullan
+      try {
+        print('📤 Sending request to API...');
+        response = await _mlService.getPrediction(request);
+        print('✅ Prediction received from API');
+
         setState(() {
-          _predictionResult = PredictionResponse.fromMap(data);
+          _predictionResult = response;
         });
+
         _animationController.forward(from: 0);
-        _showSnackBar('✅ Tahmin başarıyla alındı!');
-      } else {
-        throw Exception('API Hatası: ${response.statusCode}');
+        _showSnackBar(
+          '✅ Tahmin başarıyla alındı!',
+          backgroundColor: Colors.green,
+        );
+      } catch (apiError) {
+        print('❌ API error, using fallback: $apiError');
+
+        // Fallback kullan
+        response = _mlService.generateFallbackPrediction(request);
+
+        setState(() {
+          _predictionResult = response;
+        });
+
+        _animationController.forward(from: 0);
+        _showSnackBar(
+          '⚠️ API kullanılamadı, yerel tahmin kullanıldı',
+          backgroundColor: Colors.orange,
+        );
       }
     } catch (e) {
+      print('❌ Prediction error: $e');
       _showSnackBar('Hata: ${e.toString()}');
-      // Fallback: Basit tahmin
-      _generateFallbackPrediction();
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _generateFallbackPrediction() {
-    Map<String, ProcessParams> predictions = {};
-    double thickness = double.parse(_thicknessController.text);
-
-    _selectedProcesses.forEach((processType, isSelected) {
-      if (isSelected) {
-        if (processType == 'cutting') {
-          predictions[processType] = ProcessParams(
-            power: 70 + (thickness * 3),
-            speed: 300 - (thickness * 20),
-            passes: (thickness / 4).ceil(),
-          );
-        } else if (processType == 'engraving') {
-          predictions[processType] = ProcessParams(
-            power: 40 + (thickness * 2),
-            speed: 500 - (thickness * 15),
-            passes: 1,
-          );
-        } else if (processType == 'scoring') {
-          predictions[processType] = ProcessParams(
-            power: 55 + (thickness * 2.5),
-            speed: 400 - (thickness * 18),
-            passes: 1,
-          );
-        }
-      }
-    });
-
-    setState(() {
-      _predictionResult = PredictionResponse(
-        predictions: predictions,
-        confidenceScore: 0.5,
-        notes:
-            '⚠️ Bu tahmin basit bir algoritmaya dayanıyor. ML servisi bağlantısı kurulamadı.',
-      );
-    });
-    _animationController.forward(from: 0);
-  }
-
-  void _showSnackBar(String message) {
+  void _showSnackBar(String message, {Color? backgroundColor}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
+        backgroundColor: backgroundColor,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -224,14 +227,38 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          IconButton(
-            icon: Icon(
-              _apiHealthy ? Icons.cloud_done : Icons.cloud_off,
-              color: _apiHealthy ? Colors.white : Colors.orange,
+          // API Status Indicator
+          if (_isCheckingHealth)
+            const Padding(
+              padding: EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: IconButton(
+                icon: Icon(
+                  _apiHealthy ? Icons.cloud_done : Icons.cloud_off,
+                  color: _apiHealthy ? Colors.white : Colors.orange,
+                ),
+                onPressed: _checkApiHealth,
+                tooltip:
+                    _apiHealthy
+                        ? 'ML Servisi Aktif\n$API_URL'
+                        : 'ML Servisi Bağlantı Yok\nTekrar dene',
+              ),
             ),
-            onPressed: _checkApiHealth,
-            tooltip:
-                _apiHealthy ? 'ML Servisi Aktif' : 'ML Servisi Bağlantı Yok',
+          // Info button
+          IconButton(
+            icon: const Icon(Icons.info_outline, color: Colors.white),
+            onPressed: () => _showInfoDialog(),
           ),
         ],
       ),
@@ -243,6 +270,58 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // API Status Card
+                if (!_apiHealthy && !_isCheckingHealth)
+                  Card(
+                    color: Colors.orange.shade50,
+                    elevation: 2,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            color: Colors.orange.shade700,
+                            size: 32,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'API Bağlantısı Yok',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.orange.shade900,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Yerel tahmin algoritması kullanılacak. '
+                                  'İnternet bağlantınızı kontrol edin.',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.orange.shade800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _checkApiHealth,
+                            child: const Text('Tekrar Dene'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                 // Bilgilendirme kartı
                 Card(
                   color: Colors.green.shade50,
@@ -274,7 +353,8 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Makine öğrenmesi ile topluluk verilerinden en uygun parametreleri tahmin ediyoruz.',
+                                'Topluluk verilerinden öğrenen ML modeli ile '
+                                'en uygun parametreleri tahmin ediyoruz.',
                                 style: TextStyle(
                                   fontSize: 13,
                                   color: Colors.green.shade800,
@@ -359,7 +439,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                 // Tahmin butonu
                 CustomButton(
                   text: '🎯 Tahmini Getir',
-                  onPressed: _getPrediction,
+                  onPressed: _isLoading ? null : _getPrediction,
                   isLoading: _isLoading,
                 ),
 
@@ -378,6 +458,82 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
       ),
     );
   }
+
+  void _showInfoDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.green),
+                SizedBox(width: 12),
+                Text('API Bilgisi'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Bu uygulama Render.com üzerinde barındırılan bir ML API kullanır.',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'API URL:',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                SelectableText(
+                  API_URL,
+                  style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                ),
+                const SizedBox(height: 12),
+                const Text('Özellikler:'),
+                const Text('• Cloud-based ML tahminleri'),
+                const Text('• Offline fallback desteği'),
+                const Text('• Gerçek zamanlı sağlık kontrolü'),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.schedule,
+                        size: 16,
+                        color: Colors.blue.shade700,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'İlk istek 30-60 saniye sürebilir (cold start)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Tamam'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  // ... (Diğer widget metodları aynı kalacak, sadece ekranın geri kalanı)
+  // _buildSectionCard, _buildDropdownField, _buildChipSelector, vs.
 
   Widget _buildSectionCard({
     required String title,
@@ -415,33 +571,35 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     required List<String> options,
     required IconData icon,
   }) {
-    return CustomTextField(
+    return TextField(
       controller: controller,
-      label: label,
-      suffixIcon: PopupMenuButton<String>(
-        icon: Icon(Icons.arrow_drop_down, color: Colors.green),
-        onSelected: (value) {
-          if (value == 'Diğer') {
-            // Kullanıcı manuel girecek
-            controller.clear();
-          } else {
-            controller.text = value;
-          }
-        },
-        itemBuilder: (context) {
-          return options.map((option) {
-            return PopupMenuItem<String>(
-              value: option,
-              child: Row(
-                children: [
-                  Icon(icon, size: 20, color: Colors.green),
-                  const SizedBox(width: 8),
-                  Text(option),
-                ],
-              ),
-            );
-          }).toList();
-        },
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        suffixIcon: PopupMenuButton<String>(
+          icon: const Icon(Icons.arrow_drop_down, color: Colors.green),
+          onSelected: (value) {
+            if (value == 'Diğer') {
+              controller.clear();
+            } else {
+              controller.text = value;
+            }
+          },
+          itemBuilder: (context) {
+            return options.map((option) {
+              return PopupMenuItem<String>(
+                value: option,
+                child: Row(
+                  children: [
+                    Icon(icon, size: 20, color: Colors.green),
+                    const SizedBox(width: 8),
+                    Text(option),
+                  ],
+                ),
+              );
+            }).toList();
+          },
+        ),
       ),
     );
   }
@@ -487,9 +645,12 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               }).toList(),
         ),
         const SizedBox(height: 8),
-        CustomTextField(
+        TextField(
           controller: controller,
-          label: 'veya manuel girin',
+          decoration: InputDecoration(
+            labelText: 'veya manuel girin',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+          ),
           keyboardType: TextInputType.number,
         ),
       ],
@@ -677,7 +838,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               ],
             ),
           ),
-          Container(
+          SizedBox(
             width: isLarge ? 80 : 60,
             height: isLarge ? 80 : 60,
             child: Stack(
@@ -811,38 +972,6 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
           ),
         ),
       ],
-    );
-  }
-}
-
-// CustomTextField için suffix icon desteği ekle
-class CustomTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
-  final bool obscureText;
-  final TextInputType keyboardType;
-  final Widget? suffixIcon;
-
-  const CustomTextField({
-    Key? key,
-    required this.controller,
-    required this.label,
-    this.obscureText = false,
-    this.keyboardType = TextInputType.text,
-    this.suffixIcon,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      obscureText: obscureText,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        suffixIcon: suffixIcon,
-      ),
     );
   }
 }
