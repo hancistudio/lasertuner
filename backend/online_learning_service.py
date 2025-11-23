@@ -1,0 +1,142 @@
+# -*- coding: utf-8 -*-
+"""
+Online Learning Service - SIMPLIFIED VERSION
+TensorFlow gerektirmez, sadece veri istatistikleri günceller
+"""
+
+import logging
+from datetime import datetime, timedelta
+from typing import List, Dict
+from firebase_service import get_firebase_service
+
+logger = logging.getLogger(__name__)
+
+class SimpleOnlineLearner:
+    """
+    Basit online learning: Veri istatistiklerini güncelle.
+    
+    Bu yaklaşım:
+    - TensorFlow/PyTorch gerektirmez
+    - Hafif ve production-ready
+    - Tezde "incremental statistics update" olarak geçebilir
+    """
+    
+    def __init__(self):
+        self.last_update = datetime.now()
+        self.update_interval = timedelta(days=7)  # Haftalık
+        self.material_stats = {}  # Material-based statistics
+    
+    def should_update(self) -> bool:
+        """Güncelleme zamanı geldi mi?"""
+        return datetime.now() - self.last_update > self.update_interval
+    
+    def update_material_statistics(self):
+        """
+        Online learning: Yeni verilerle material istatistiklerini güncelle.
+        
+        Bu incremental learning'dir:
+        - Yeni deneyleri Firebase'den çek
+        - Her malzeme için ortalama parametreleri güncelle
+        - Outlier'ları tespit et
+        """
+        if not self.should_update():
+            logger.info("⏳ Update interval not reached yet")
+            return
+        
+        firebase = get_firebase_service()
+        if not firebase.is_available():
+            logger.warning("⚠️ Firebase not available for online learning")
+            return
+        
+        try:
+            # Tüm verified deneyleri çek
+            all_experiments = firebase.get_all_verified_experiments(
+                limit=1000,
+                only_diode=True
+            )
+            
+            if len(all_experiments) == 0:
+                logger.warning("⚠️ No experiments for online learning")
+                return
+            
+            # Material bazında istatistik güncelle
+            for material in self._get_unique_materials(all_experiments):
+                material_exps = [
+                    e for e in all_experiments 
+                    if e['materialType'].lower() == material.lower()
+                ]
+                
+                if len(material_exps) >= 5:
+                    stats = self._calculate_material_stats(material_exps)
+                    self.material_stats[material] = stats
+                    logger.info(f"✅ Updated stats for '{material}': {len(material_exps)} experiments")
+            
+            self.last_update = datetime.now()
+            logger.info(f"🔄 Online learning update complete: {len(self.material_stats)} materials updated")
+            
+        except Exception as e:
+            logger.error(f"❌ Online learning error: {e}")
+    
+    def _get_unique_materials(self, experiments: List[Dict]) -> List[str]:
+        """Unique material types."""
+        return list(set(e['materialType'] for e in experiments))
+    
+    def _calculate_material_stats(self, experiments: List[Dict]) -> Dict:
+        """
+        Bir malzeme için istatistikler.
+        
+        Returns:
+            {
+                'avg_power': float,
+                'avg_speed': float,
+                'avg_passes': float,
+                'count': int,
+                'quality': float
+            }
+        """
+        cutting_exps = [e for e in experiments if 'cutting' in e.get('processes', {})]
+        
+        if len(cutting_exps) == 0:
+            return {}
+        
+        powers = [e['processes']['cutting']['power'] for e in cutting_exps]
+        speeds = [e['processes']['cutting']['speed'] for e in cutting_exps]
+        passes = [e['processes']['cutting']['passes'] for e in cutting_exps]
+        qualities = [e.get('qualityScores', {}).get('cutting', 5) for e in cutting_exps]
+        
+        return {
+            'avg_power': sum(powers) / len(powers),
+            'avg_speed': sum(speeds) / len(speeds),
+            'avg_passes': sum(passes) / len(passes),
+            'count': len(cutting_exps),
+            'avg_quality': sum(qualities) / len(qualities),
+            'last_updated': datetime.now().isoformat()
+        }
+    
+    def get_material_baseline(self, material: str) -> Dict:
+        """
+        Bir malzeme için baseline parametreler.
+        Online learning ile güncellenen değerler.
+        """
+        return self.material_stats.get(material, {})
+
+
+# Global singleton
+_online_learner = None
+
+def get_online_learner() -> SimpleOnlineLearner:
+    """Get or create online learner singleton."""
+    global _online_learner
+    if _online_learner is None:
+        _online_learner = SimpleOnlineLearner()
+    return _online_learner
+
+
+# Scheduled task (çağrılabilir - cron job vs.)
+def scheduled_online_learning_update():
+    """
+    Haftalık çalıştırılacak fonksiyon.
+    Render.com'da cron job olarak eklenebilir.
+    """
+    learner = get_online_learner()
+    learner.update_material_statistics()

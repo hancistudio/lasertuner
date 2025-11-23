@@ -1,41 +1,35 @@
 # -*- coding: utf-8 -*-
 """
-ML Prediction Service - IMPROVED VERSION
-Combines static algorithms with real user data + smart scaling
+ML Prediction Service - FIREBASE DATA DRIVEN
+Sadece Firebase'deki kullanıcı verilerini kullanır
+Transfer Learning: Implicit similarity-based approach
 """
 
 import logging
 from typing import Dict, List, Tuple, Optional
 from statistics import mean, median
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
-# Makina aileleri - benzer makinaları grupla
-MACHINE_FAMILIES = {
-    'diode': ['xtool', 'atomstack', 'ortur', 'sculpfun', 'creality'],
-    'co2': ['epilog', 'trotec', 'thunder', 'universal', 'boss'],
-    'fiber': ['raycus', 'jpt', 'max photonics', 'ipg'],
-}
-
 class MLPredictionService:
-    """Service for making predictions using real data with smart scaling"""
+    """
+    Firebase tabanlı tahmin servisi.
+    
+    Transfer Learning Yaklaşımı:
+    1. Material similarity (benzer malzemeler)
+    2. Thickness proximity (yakın kalınlıklar)
+    3. Power adaptation (güç ölçekleme)
+    4. Quality weighting (kaliteli veri öncelik)
+    
+    Bu implicit transfer learning yaklaşımıdır.
+    """
     
     def __init__(self):
-        """Initialize prediction service"""
-        self.min_data_points = 3  # Minimum data points to use real data
-        self.quality_threshold = 5  # Minimum quality score
-        self.power_tolerance = 20  # ±20W tolerance for power matching
-        self.thickness_tolerance = 2.0  # ±2mm tolerance
-    
-    def get_machine_family(self, machine_brand: str) -> str:
-        """Determine machine family from brand name"""
-        brand_lower = machine_brand.lower()
-        
-        for family, brands in MACHINE_FAMILIES.items():
-            if any(brand in brand_lower for brand in brands):
-                return family
-        
-        return 'unknown'
+        self.min_data_points = 3
+        self.quality_threshold = 5
+        self.power_tolerance = 10  # ±10W (küçültüldü, daha hassas)
+        self.thickness_tolerance = 1.5
     
     def predict_from_data(
         self,
@@ -43,135 +37,216 @@ class MLPredictionService:
         process_type: str,
         material_type: str,
         thickness: float,
-        target_power: float = None
+        target_power: float
     ) -> Tuple[Optional[Dict], float, str]:
         """
-        Make prediction based on real experiment data with smart scaling
+        Firebase verilerinden tahmin yap.
         
         Args:
-            experiments: List of similar experiments
-            process_type: 'cutting', 'engraving', or 'scoring'
-            material_type: Material type
-            thickness: Material thickness
-            target_power: Target laser power (for scaling)
+            experiments: Firebase'den gelen benzer deneyler
+            process_type: 'cutting', 'engraving', 'scoring'
+            material_type: Malzeme türü
+            thickness: Kalınlık (mm)
+            target_power: Hedef lazer gücü (W)
         
         Returns:
-            Tuple of (predictions, confidence_score, notes)
+            (predictions_dict, confidence_score, notes_string)
         """
-        # Filter experiments that have this process type
-        relevant_experiments = []
-        for exp in experiments:
-            processes = exp.get('processes', {})
-            if process_type in processes:
-                # Check quality score
-                quality = exp.get('qualityScores', {}).get(process_type, 0)
-                if quality >= self.quality_threshold:
-                    relevant_experiments.append(exp)
+        # 1. Process type filtreleme
+        relevant_experiments = self._filter_by_process_and_quality(
+            experiments, process_type
+        )
         
         data_points = len(relevant_experiments)
         
-        # If not enough data, return None (will use static algorithm)
+        # Yetersiz veri → None (static algorithm kullanılacak)
         if data_points < self.min_data_points:
-            return None, 0.0, f"Yetersiz veri ({data_points} deney)"
+            logger.info(f"⚠️ Insufficient data: {data_points} experiments")
+            return None, 0.0, f"Yetersiz topluluk verisi ({data_points} deney)"
         
-        # Calculate base predictions from real data
-        base_predictions = self._calculate_average_params(
+        # 2. Similarity scoring (TRANSFER LEARNING: similarity-based transfer)
+        similarity_scores = self._calculate_similarity_scores(
             relevant_experiments,
+            target_material=material_type,
+            target_thickness=thickness,
+            target_power=target_power
+        )
+        
+        # 3. Weighted averaging (DOMAIN ADAPTATION)
+        base_predictions = self._weighted_average(
+            relevant_experiments,
+            similarity_scores,
             process_type
         )
         
-        # Check if power scaling is needed
-        avg_source_power = mean([e.get('laserPower', 0) for e in relevant_experiments])
-        power_difference = abs(avg_source_power - target_power) if target_power else 0
+        # 4. Power scaling (FEW-SHOT LEARNING)
+        avg_source_power = np.average(
+            [e.get('laserPower', 20) for e in relevant_experiments],
+            weights=similarity_scores
+        )
+        power_difference = abs(avg_source_power - target_power)
         
-        if target_power and power_difference > self.power_tolerance:
-            # Apply power scaling
-            scaled_predictions = self._scale_by_power(
+        if power_difference > self.power_tolerance:
+            predictions = self._scale_by_power(
                 base_predictions,
                 source_power=avg_source_power,
                 target_power=target_power
             )
-            predictions = scaled_predictions
             was_scaled = True
         else:
             predictions = base_predictions
             was_scaled = False
         
-        # Calculate confidence score
+        # 5. Confidence calculation
         confidence = self._calculate_confidence(
-            data_points,
-            relevant_experiments,
-            process_type,
-            was_scaled=was_scaled,
-            power_difference=power_difference
+            data_points=data_points,
+            experiments=relevant_experiments,
+            similarity_scores=similarity_scores,
+            power_difference=power_difference,
+            was_scaled=was_scaled
         )
         
-        # Generate notes
+        # 6. Notes generation
         notes = self._generate_notes(
-            data_points,
-            confidence,
-            relevant_experiments,
-            process_type,
+            data_points=data_points,
+            confidence=confidence,
+            experiments=relevant_experiments,
+            process_type=process_type,
             was_scaled=was_scaled,
-            avg_source_power=avg_source_power,
-            target_power=target_power
+            power_diff=power_difference
         )
         
         logger.info(
-            f"✅ Prediction from {data_points} experiments: "
-            f"power={predictions['power']}, speed={predictions['speed']}, "
-            f"confidence={confidence:.2f}, scaled={was_scaled}"
+            f"✅ Prediction: {predictions['power']:.1f}%, {predictions['speed']:.0f}mm/s, "
+            f"{predictions['passes']} passes | confidence={confidence:.2f}"
         )
         
         return predictions, confidence, notes
     
-    def _calculate_average_params(
+    def _filter_by_process_and_quality(
         self,
         experiments: List[Dict],
         process_type: str
-    ) -> Dict:
-        """Calculate weighted average parameters"""
-        powers = []
-        speeds = []
-        passes_list = []
-        weights = []
+    ) -> List[Dict]:
+        """Process type ve quality threshold ile filtrele."""
+        filtered = []
+        for exp in experiments:
+            processes = exp.get('processes', {})
+            if process_type in processes:
+                quality = exp.get('qualityScores', {}).get(process_type, 0)
+                if quality >= self.quality_threshold:
+                    filtered.append(exp)
+        return filtered
+    
+    def _calculate_similarity_scores(
+        self,
+        experiments: List[Dict],
+        target_material: str,
+        target_thickness: float,
+        target_power: float
+    ) -> np.ndarray:
+        """
+        TRANSFER LEARNING CORE: Similarity-based knowledge transfer.
+        
+        Her deneyin hedef parametrelere benzerlik skoru.
+        Bu skorlar, hangi deneylerden ne kadar bilgi transfer edileceğini belirler.
+        """
+        scores = []
         
         for exp in experiments:
-            process_data = exp['processes'][process_type]
-            quality = exp.get('qualityScores', {}).get(process_type, 5)
+            # 1. Material similarity (exact match veya similar group)
+            exp_material = exp.get('materialType', '').lower()
+            target_lower = target_material.lower()
+            
+            if exp_material == target_lower:
+                material_score = 1.0  # Perfect match
+            elif self._are_similar_materials(exp_material, target_lower):
+                material_score = 0.6  # Similar materials (transfer learning!)
+            else:
+                material_score = 0.3  # Different but organic
+            
+            # 2. Thickness similarity (exponential decay)
+            thickness_diff = abs(exp.get('materialThickness', 3.0) - target_thickness)
+            thickness_score = np.exp(-thickness_diff / 1.5)  # Decay: 1.5mm
+            
+            # 3. Power similarity (exponential decay)
+            power_diff = abs(exp.get('laserPower', 20) - target_power)
+            power_score = np.exp(-power_diff / 10.0)  # Decay: 10W
+            
+            # 4. Quality score (0-1)
+            quality = exp.get('qualityScores', {}).get('cutting', 5)
+            quality_score = quality / 10.0
+            
+            # 5. Approve boost
             approve_count = exp.get('approveCount', 0)
+            approve_boost = min(approve_count * 0.1, 1.0)
             
-            # Weight: quality score + approval votes + gold standard bonus
-            weight = quality + (approve_count * 0.5)
+            # 6. Gold standard super boost
+            is_gold = exp.get('dataSource') in ['researcher', 'researcher_import']
+            gold_boost = 1.5 if is_gold else 1.0
             
-            # Bonus for gold standard data
-            if exp.get('dataSource') in ['researcher', 'researcher_import']:
-                weight *= 1.5
+            # Combined score (weighted)
+            combined = (
+                material_score * 0.35 +      # Material: 35%
+                thickness_score * 0.30 +     # Thickness: 30%
+                power_score * 0.20 +         # Power: 20%
+                quality_score * 0.15         # Quality: 15%
+            ) * (1 + approve_boost) * gold_boost
             
-            powers.append(process_data['power'])
-            speeds.append(process_data['speed'])
-            passes_list.append(process_data['passes'])
-            weights.append(weight)
+            scores.append(combined)
         
-        # Weighted average
-        total_weight = sum(weights)
+        # Softmax normalization
+        scores = np.array(scores)
+        exp_scores = np.exp(scores - np.max(scores))
+        normalized = exp_scores / exp_scores.sum()
         
-        avg_power = sum(p * w for p, w in zip(powers, weights)) / total_weight
-        avg_speed = sum(s * w for s, w in zip(speeds, weights)) / total_weight
-        avg_passes = round(sum(p * w for p, w in zip(passes_list, weights)) / total_weight)
+        logger.debug(f"📊 Similarity scores: min={scores.min():.3f}, max={scores.max():.3f}")
         
-        # Also calculate median for robustness (avoid outliers)
-        median_power = median(powers)
-        median_speed = median(speeds)
+        return normalized
+    
+    def _are_similar_materials(self, mat1: str, mat2: str) -> bool:
+        """Benzer malzeme grupları (transfer learning için)."""
+        wood_group = ['ahşap', 'ahsap', 'wood', 'mdf']
+        paper_group = ['kağıt', 'kagit', 'paper', 'karton', 'cardboard']
+        fabric_group = ['kumaş', 'kumas', 'fabric', 'keçe', 'felt']
+        leather_group = ['deri', 'leather']
         
-        # Use weighted average but constrain by median
-        final_power = (avg_power * 0.7) + (median_power * 0.3)
-        final_speed = (avg_speed * 0.7) + (median_speed * 0.3)
+        for group in [wood_group, paper_group, fabric_group, leather_group]:
+            if mat1 in group and mat2 in group:
+                return True
+        return False
+    
+    def _weighted_average(
+        self,
+        experiments: List[Dict],
+        weights: np.ndarray,
+        process_type: str
+    ) -> Dict:
+        """Weighted average (domain adaptation)."""
+        weighted_power = 0.0
+        weighted_speed = 0.0
+        passes_list = []
+        
+        for exp, weight in zip(experiments, weights):
+            process_data = exp['processes'][process_type]
+            weighted_power += process_data['power'] * weight
+            weighted_speed += process_data['speed'] * weight
+            passes_list.append((process_data['passes'], weight))
+        
+        # Passes: weighted median
+        passes_sorted = sorted(passes_list, key=lambda x: x[0])
+        cumulative_weight = 0.0
+        median_passes = 1
+        for passes_val, weight in passes_sorted:
+            cumulative_weight += weight
+            if cumulative_weight >= 0.5:
+                median_passes = passes_val
+                break
         
         return {
-            'power': round(max(10, min(100, final_power)), 1),
-            'speed': round(max(50, min(1000, final_speed)), 0),
-            'passes': max(1, min(10, avg_passes))
+            'power': round(max(10, min(100, weighted_power)), 1),
+            'speed': round(max(50, min(500, weighted_speed)), 0),
+            'passes': max(1, min(20, median_passes))
         }
     
     def _scale_by_power(
@@ -180,143 +255,74 @@ class MLPredictionService:
         source_power: float,
         target_power: float
     ) -> Dict:
-        """
-        Scale parameters based on laser power difference
-        
-        Logic:
-        - Higher power → can cut faster (speed increases)
-        - Higher power → use lower power percentage
-        - Passes usually stay the same
-        """
-        if source_power <= 0 or target_power <= 0:
-            return params
-        
+        """Power scaling (few-shot learning)."""
         power_ratio = target_power / source_power
         
-        # Power scaling: inverse relationship (higher laser = lower %)
-        scaled_power = params['power'] / (power_ratio ** 0.5)
+        # Power percentage: inverse
+        scaled_power = params['power'] / (power_ratio ** 0.4)
         
-        # Speed scaling: direct relationship (higher laser = faster)
-        scaled_speed = params['speed'] * (power_ratio ** 0.4)
+        # Speed: direct
+        scaled_speed = params['speed'] * (power_ratio ** 0.3)
         
-        # Passes: only increase if power is much lower
-        if power_ratio < 0.5:
-            scaled_passes = params['passes'] + 1
-        else:
-            scaled_passes = params['passes']
+        # Passes: conditional
+        scaled_passes = params['passes']
+        if power_ratio < 0.7:
+            scaled_passes += 1
+        elif power_ratio > 1.3:
+            scaled_passes = max(1, scaled_passes - 1)
+        
+        logger.info(f"⚖️ Power scaling: {source_power:.0f}W → {target_power:.0f}W")
         
         return {
             'power': round(max(10, min(100, scaled_power)), 1),
-            'speed': round(max(50, min(1000, scaled_speed)), 0),
-            'passes': max(1, min(10, scaled_passes))
+            'speed': round(max(50, min(500, scaled_speed)), 0),
+            'passes': max(1, min(20, scaled_passes))
         }
     
     def _calculate_confidence(
         self,
         data_points: int,
         experiments: List[Dict],
-        process_type: str,
-        was_scaled: bool = False,
-        power_difference: float = 0
+        similarity_scores: np.ndarray,
+        power_difference: float,
+        was_scaled: bool
     ) -> float:
-        """Calculate confidence score based on data quality and quantity"""
-        # Base confidence from data points
+        """Confidence score calculation."""
+        # Base from quantity
         if data_points >= 50:
-            base_confidence = 0.90
+            base = 0.90
         elif data_points >= 20:
-            base_confidence = 0.85
+            base = 0.85
         elif data_points >= 10:
-            base_confidence = 0.75
+            base = 0.75
         elif data_points >= 5:
-            base_confidence = 0.68
+            base = 0.68
         else:
-            base_confidence = 0.60
+            base = 0.60
         
-        # Adjust based on data quality
-        qualities = [
-            exp.get('qualityScores', {}).get(process_type, 5)
-            for exp in experiments
-        ]
-        avg_quality = mean(qualities)
-        quality_factor = avg_quality / 10  # 0.0 to 1.0
+        # Similarity factor
+        similarity_factor = float(np.mean(similarity_scores))
         
-        # Adjust based on consistency (variance)
-        powers = [exp['processes'][process_type]['power'] for exp in experiments]
-        speeds = [exp['processes'][process_type]['speed'] for exp in experiments]
+        # Gold standard boost
+        gold_ratio = sum(
+            1 for e in experiments 
+            if e.get('dataSource') in ['researcher', 'researcher_import']
+        ) / len(experiments)
+        gold_boost = 1.0 + (gold_ratio * 0.1)
         
-        power_variance = self._calculate_variance(powers)
-        speed_variance = self._calculate_variance(speeds)
-        
-        # Lower variance = higher confidence
-        consistency_factor = 1.0 - min(0.2, (power_variance + speed_variance) / 2)
-        
-        # ✨ NEW: Laser power diversity check
-        laser_powers = [exp.get('laserPower', 0) for exp in experiments]
-        power_range = max(laser_powers) - min(laser_powers)
-        
-        if power_range < 20:
-            power_diversity_factor = 1.0  # Narrow range - good
-        elif power_range < 50:
-            power_diversity_factor = 0.90  # Medium range
-        else:
-            power_diversity_factor = 0.75  # Wide range - mixed data
-        
-        # ✨ NEW: Machine brand diversity check
-        brands = [exp.get('machineBrand', '').lower() for exp in experiments]
-        unique_brands = len(set(brands))
-        
-        if unique_brands == 1:
-            brand_factor = 1.0  # Single brand - consistent
-        elif unique_brands <= 3:
-            brand_factor = 0.90  # Few brands - good
-        else:
-            brand_factor = 0.80  # Many brands - general data
-        
-        # ✨ NEW: Scaling penalty
+        # Scaling penalty
         if was_scaled:
-            if power_difference < 30:
-                scaling_factor = 0.90  # Small difference
-            elif power_difference < 60:
-                scaling_factor = 0.80  # Medium difference
+            if power_difference < 15:
+                power_penalty = 0.95
+            elif power_difference < 30:
+                power_penalty = 0.85
             else:
-                scaling_factor = 0.70  # Large difference
+                power_penalty = 0.75
         else:
-            scaling_factor = 1.0
+            power_penalty = 1.0
         
-        # ✨ NEW: Gold standard bonus
-        gold_count = sum(
-            1 for exp in experiments
-            if exp.get('dataSource') in ['researcher', 'researcher_import']
-        )
-        gold_ratio = gold_count / len(experiments)
-        gold_bonus = 1.0 + (gold_ratio * 0.1)  # Up to +10%
-        
-        # Final confidence
-        confidence = (
-            base_confidence * 
-            quality_factor * 
-            consistency_factor * 
-            power_diversity_factor *
-            brand_factor *
-            scaling_factor *
-            gold_bonus
-        )
-        
+        confidence = base * similarity_factor * gold_boost * power_penalty
         return round(min(0.95, max(0.55, confidence)), 2)
-    
-    def _calculate_variance(self, values: List[float]) -> float:
-        """Calculate normalized variance (0.0 to 1.0)"""
-        if len(values) < 2:
-            return 0.0
-        
-        avg = mean(values)
-        if avg == 0:
-            return 1.0
-        
-        variance = sum((x - avg) ** 2 for x in values) / len(values)
-        normalized = variance / (avg ** 2)
-        
-        return min(1.0, normalized)
     
     def _generate_notes(
         self,
@@ -324,94 +330,50 @@ class MLPredictionService:
         confidence: float,
         experiments: List[Dict],
         process_type: str,
-        was_scaled: bool = False,
-        avg_source_power: float = 0,
-        target_power: float = None
+        was_scaled: bool,
+        power_diff: float
     ) -> str:
-        """Generate informative notes about the prediction"""
-        qualities = [
-            exp.get('qualityScores', {}).get(process_type, 5)
-            for exp in experiments
-        ]
-        avg_quality = mean(qualities)
+        """Generate user-facing notes."""
+        parts = []
         
-        # Gold standard count
-        gold_count = sum(
-            1 for exp in experiments
-            if exp.get('dataSource') in ['researcher', 'researcher_import']
-        )
-        
-        # Machine diversity
-        brands = set([exp.get('machineBrand', 'Unknown') for exp in experiments])
-        
-        notes_parts = []
-        
-        # Main confidence indicator
+        # Confidence
         if confidence >= 0.80:
-            notes_parts.append("✅ Yüksek güvenilirlik")
+            parts.append("✅ Yüksek güvenilirlik")
         elif confidence >= 0.65:
-            notes_parts.append("ℹ️ Orta güvenilirlik")
+            parts.append("ℹ️ Orta güvenilirlik")
         else:
-            notes_parts.append("⚠️ Düşük güvenilirlik")
+            parts.append("⚠️ Düşük güvenilirlik")
         
-        # Data info
-        notes_parts.append(f"{data_points} benzer deney verisine dayanıyor")
+        # Data count
+        parts.append(f"{data_points} benzer deney")
         
-        # Scaling info
-        if was_scaled and target_power and avg_source_power:
-            notes_parts.append(
-                f"🔧 {avg_source_power:.0f}W → {target_power:.0f}W güç ölçeklendi"
-            )
+        # Scaling
+        if was_scaled:
+            parts.append(f"🔧 {power_diff:.0f}W güç farkı ölçeklendirildi")
         
-        # Quality info
-        notes_parts.append(f"Ortalama kalite: {avg_quality:.1f}/10")
+        # Quality
+        avg_quality = mean([
+            e.get('qualityScores', {}).get(process_type, 5) 
+            for e in experiments
+        ])
+        parts.append(f"Kalite: {avg_quality:.1f}/10")
         
-        # Gold standard info
-        if gold_count > 0:
-            notes_parts.append(f"🌟 {gold_count} gold standard veri")
-        
-        # Machine diversity warning
-        if len(brands) > 3:
-            notes_parts.append(f"⚙️ {len(brands)} farklı makina")
-        
-        return " | ".join(notes_parts)
-    
-    def get_fallback_prediction(
-        self,
-        material_type: str,
-        thickness: float,
-        process_type: str
-    ) -> Dict:
-        """Get fallback prediction using static algorithm"""
-        # Import here to avoid circular dependency
-        from main import (
-            calculate_cutting_params,
-            calculate_engraving_params,
-            calculate_scoring_params
+        # Gold standard
+        gold_count = sum(
+            1 for e in experiments 
+            if e.get('dataSource') in ['researcher', 'researcher_import']
         )
+        if gold_count > 0:
+            parts.append(f"🌟 {gold_count} gold standard")
         
-        if process_type == 'cutting':
-            params = calculate_cutting_params(material_type, thickness)
-        elif process_type == 'engraving':
-            params = calculate_engraving_params(material_type, thickness)
-        elif process_type == 'scoring':
-            params = calculate_scoring_params(material_type, thickness)
-        else:
-            # Default params
-            return {'power': 50.0, 'speed': 300.0, 'passes': 1}
-        
-        return {
-            'power': params.power,
-            'speed': params.speed,
-            'passes': params.passes
-        }
+        return " | ".join(parts)
 
 
-# Global instance
+# Global singleton
 _ml_service = None
 
 def get_ml_service() -> MLPredictionService:
-    """Get or create ML service singleton"""
+    """Get or create ML service singleton."""
     global _ml_service
     if _ml_service is None:
         _ml_service = MLPredictionService()

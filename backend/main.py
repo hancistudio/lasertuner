@@ -3,7 +3,7 @@
 LaserTuner ML API v3.0 - DIODE LASER EDITION
 Backend API for Diode Laser Machines (2W-40W)
 """
-
+from online_learning_service import get_online_learner 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -504,6 +504,15 @@ async def startup_event():
         logger.info(f"✅ Firebase connected")
         logger.info(f"📊 Total experiments: {stats.get('total_experiments', 0)}")
         logger.info(f"✅ Verified experiments: {stats.get('verified_experiments', 0)}")
+        
+        # ✨ YENİ: Online learning başlat
+        try:
+            learner = get_online_learner()
+            if learner.should_update():
+                logger.info("🔄 Running online learning update...")
+                learner.update_material_statistics()
+        except Exception as e:
+            logger.warning(f"⚠️ Online learning initialization failed: {e}")
     else:
         logger.warning("⚠️ Firebase not available - using diode laser algorithms only")
     
