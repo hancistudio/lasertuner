@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
+import 'package:lasertuner/config/app_config.dart';
 import 'dart:typed_data';
 import '../models/experiment_model.dart';
 import '../services/firestore_service.dart';
@@ -94,12 +95,59 @@ class _AddDataScreenState extends State<AddDataScreen> {
     }
   }
 
+  bool _validateInputs() {
+    // Material validation
+    final material = _materialTypeController.text;
+    for (String unsupported in AppConfig.UNSUPPORTED_MATERIALS) {
+      if (material.toLowerCase().contains(unsupported.toLowerCase())) {
+        _showSnackBar(
+          '❌ $material diode lazer için uygun değil! '
+          'Lütfen ${AppConfig.SUPPORTED_MATERIALS.join(", ")} gibi malzemeler kullanın.',
+        );
+        return false;
+      }
+    }
+
+    // Power validation
+    final power = double.tryParse(_laserPowerController.text) ?? 0;
+    if (power < AppConfig.MIN_LASER_POWER ||
+        power > AppConfig.MAX_LASER_POWER) {
+      _showSnackBar(
+        '❌ Diode lazer gücü ${AppConfig.MIN_LASER_POWER}W - ${AppConfig.MAX_LASER_POWER}W arasında olmalı!',
+      );
+      return false;
+    }
+
+    // Thickness validation
+    final thickness = double.tryParse(_thicknessController.text) ?? 0;
+    if (thickness > AppConfig.MAX_THICKNESS) {
+      _showSnackBar(
+        '❌ Diode lazerler max ${AppConfig.MAX_THICKNESS}mm kesebilir!',
+      );
+      return false;
+    }
+
+    if (thickness > 6) {
+      // Warning, not error
+      _showSnackBar(
+        '⚠️ ${thickness}mm kalınlık diode lazer için zorlu olabilir. İdeal: 2-5mm',
+      );
+    }
+
+    return true;
+  }
+
   Future<void> _submitData() async {
     if (_machineBrandController.text.isEmpty ||
         _laserPowerController.text.isEmpty ||
         _materialTypeController.text.isEmpty ||
         _thicknessController.text.isEmpty) {
       _showSnackBar('Lütfen tüm alanları doldurun');
+      return;
+    }
+
+    // ✨ NEW: Validate for diode laser
+    if (!_validateInputs()) {
       return;
     }
 

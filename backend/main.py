@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-LaserTuner ML API v3.0
-Backend API with REAL ML predictions from user data
+LaserTuner ML API v3.0 - DIODE LASER EDITION
+Backend API for Diode Laser Machines (2W-40W)
 """
 
 from fastapi import FastAPI, HTTPException, Request
@@ -14,7 +14,7 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 
-# Import our new services
+# Import our services
 from firebase_service import get_firebase_service
 from ml_prediction import get_ml_service
 
@@ -31,9 +31,9 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="LaserTuner ML API",
-    version="3.0.0",
-    description="AI-powered laser cutting parameter prediction with real user data"
+    title="LaserTuner ML API - Diode Laser Edition",
+    version="3.0.0-diode",
+    description="AI-powered diode laser cutting parameter prediction (2W-40W)"
 )
 
 # CORS Configuration
@@ -53,18 +53,18 @@ app.add_middleware(
 # ============= MODELS =============
 
 class ProcessParams(BaseModel):
-    """Process parameters for laser operations"""
-    power: float = Field(..., ge=10, le=100)
-    speed: float = Field(..., ge=50, le=1000)
-    passes: int = Field(..., ge=1, le=10)
+    """Process parameters for diode laser operations"""
+    power: float = Field(..., ge=5, le=100, description="Power percentage (5-100%)")
+    speed: float = Field(..., ge=50, le=500, description="Speed in mm/min")
+    passes: int = Field(..., ge=1, le=20, description="Number of passes")
 
 
 class PredictionRequest(BaseModel):
     """Request model for parameter prediction"""
     machineBrand: str = Field(..., min_length=1, max_length=100)
-    laserPower: float = Field(..., gt=0, le=200)
+    laserPower: float = Field(..., ge=2, le=40, description="Laser power in Watts (2-40W)")
     materialType: str = Field(..., min_length=1, max_length=50)
-    materialThickness: float = Field(..., gt=0, le=50)
+    materialThickness: float = Field(..., gt=0, le=10, description="Thickness in mm (max 10mm for diode)")
     processes: List[str] = Field(..., min_items=1, max_items=3)
 
     @validator('processes')
@@ -72,9 +72,31 @@ class PredictionRequest(BaseModel):
         valid_processes = {'cutting', 'engraving', 'scoring'}
         invalid = [p for p in v if p not in valid_processes]
         if invalid:
-            raise ValueError(f"Invalid process types: {invalid}")
+            raise ValueError(f"Geçersiz işlem türleri: {invalid}")
         if len(v) != len(set(v)):
-            raise ValueError("Duplicate process types not allowed")
+            raise ValueError("Tekrar eden işlem türlerine izin verilmiyor")
+        return v
+    
+    @validator('materialType')
+    def validate_material(cls, v):
+        # Diode lazer için uygun malzemeler
+        valid_materials = {
+            'ahşap', 'ahsap', 'wood',
+            'mdf',
+            'karton', 'cardboard',
+            'deri', 'leather',
+            'keçe', 'felt',
+            'kumaş', 'fabric', 'kumas',
+            'kağıt', 'kagit', 'paper',
+            'köpük', 'kopuk', 'foam',
+            'mantar', 'cork'
+        }
+        
+        if v.lower() not in valid_materials:
+            raise ValueError(
+                f"Diode lazer için desteklenmeyen malzeme: {v}. "
+                f"Desteklenen malzemeler: Ahşap, MDF, Karton, Deri, Keçe, Kumaş, Kağıt, Köpük, Mantar"
+            )
         return v
 
 
@@ -84,7 +106,8 @@ class PredictionResponse(BaseModel):
     confidenceScore: float = Field(..., ge=0, le=1)
     notes: str
     dataPointsUsed: int = Field(default=0, ge=0)
-    dataSource: str = Field(default="static_algorithm")  # NEW
+    dataSource: str = Field(default="static_algorithm")
+    warnings: List[str] = Field(default_factory=list)
 
 
 class HealthResponse(BaseModel):
@@ -92,75 +115,118 @@ class HealthResponse(BaseModel):
     status: str
     service: str
     version: str
+    laserType: str
+    powerRange: str
     timestamp: str
-    firebase_status: str = "unknown"  # NEW
-    total_experiments: int = 0  # NEW
+    firebase_status: str = "unknown"
+    total_experiments: int = 0
 
 
-# ============= UTILITY FUNCTIONS (Fallback) =============
+# ============= DIODE LASER PARAMETERS =============
 
-def get_material_cutting_params(material: str) -> tuple:
-    """Get base cutting parameters for material"""
+def get_diode_material_params(material: str) -> Dict:
+    """Get base parameters for diode laser materials"""
     material = material.lower()
-    material_params = {
-        'ahşap': (65, 3.0), 'ahsap': (65, 3.0), 'wood': (65, 3.0),
-        'mdf': (70, 3.5),
-        'plexiglass': (55, 2.5), 'akrilik': (55, 2.5), 'acrylic': (55, 2.5),
-        'karton': (35, 2.0), 'cardboard': (35, 2.0),
-        'deri': (40, 1.5), 'leather': (40, 1.5),
-    }
-    return material_params.get(material, (70, 3.0))
-
-
-def get_material_cutting_speeds(material: str) -> tuple:
-    """Get base cutting speeds for material"""
-    material = material.lower()
-    speed_params = {
-        'ahşap': (320, 18), 'ahsap': (320, 18), 'wood': (320, 18),
-        'mdf': (300, 20),
-        'plexiglass': (380, 25), 'akrilik': (380, 25), 'acrylic': (380, 25),
-        'karton': (450, 15), 'cardboard': (450, 15),
-        'deri': (400, 12), 'leather': (400, 12),
-    }
-    return speed_params.get(material, (300, 20))
-
-
-def calculate_cutting_params(material: str, thickness: float) -> ProcessParams:
-    """Calculate cutting parameters (fallback)"""
-    base_power, power_mult = get_material_cutting_params(material)
-    base_speed, speed_mult = get_material_cutting_speeds(material)
     
-    power = base_power + (thickness * power_mult)
-    speed = base_speed - (thickness * speed_mult)
-    passes = max(1, int(thickness / 4))
+    # Format: {base_power_%, power_per_mm, base_speed, speed_per_mm, base_passes, passes_per_mm}
+    params = {
+        # Ahşap - en yaygın kullanım
+        'ahşap': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
+        'ahsap': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
+        'wood': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
+        
+        # MDF - ahşaba benzer
+        'mdf': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
+        
+        # Karton - kolay kesilir
+        'karton': {'base_power': 50, 'power_mult': 3.0, 'base_speed': 400, 'speed_mult': 25, 'base_passes': 1, 'passes_mult': 0.3},
+        'cardboard': {'base_power': 50, 'power_mult': 3.0, 'base_speed': 400, 'speed_mult': 25, 'base_passes': 1, 'passes_mult': 0.3},
+        
+        # Deri - orta zorluk
+        'deri': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 350, 'speed_mult': 28, 'base_passes': 1, 'passes_mult': 0.4},
+        'leather': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 350, 'speed_mult': 28, 'base_passes': 1, 'passes_mult': 0.4},
+        
+        # Keçe - kolay
+        'keçe': {'base_power': 60, 'power_mult': 2.5, 'base_speed': 380, 'speed_mult': 20, 'base_passes': 1, 'passes_mult': 0.2},
+        'felt': {'base_power': 60, 'power_mult': 2.5, 'base_speed': 380, 'speed_mult': 20, 'base_passes': 1, 'passes_mult': 0.2},
+        
+        # Kumaş - çok kolay
+        'kumaş': {'base_power': 45, 'power_mult': 2.0, 'base_speed': 420, 'speed_mult': 15, 'base_passes': 1, 'passes_mult': 0.1},
+        'kumas': {'base_power': 45, 'power_mult': 2.0, 'base_speed': 420, 'speed_mult': 15, 'base_passes': 1, 'passes_mult': 0.1},
+        'fabric': {'base_power': 45, 'power_mult': 2.0, 'base_speed': 420, 'speed_mult': 15, 'base_passes': 1, 'passes_mult': 0.1},
+        
+        # Kağıt - çok kolay
+        'kağıt': {'base_power': 40, 'power_mult': 1.5, 'base_speed': 450, 'speed_mult': 10, 'base_passes': 1, 'passes_mult': 0.1},
+        'kagit': {'base_power': 40, 'power_mult': 1.5, 'base_speed': 450, 'speed_mult': 10, 'base_passes': 1, 'passes_mult': 0.1},
+        'paper': {'base_power': 40, 'power_mult': 1.5, 'base_speed': 450, 'speed_mult': 10, 'base_passes': 1, 'passes_mult': 0.1},
+        
+        # Köpük - kolay
+        'köpük': {'base_power': 55, 'power_mult': 2.0, 'base_speed': 400, 'speed_mult': 18, 'base_passes': 1, 'passes_mult': 0.2},
+        'kopuk': {'base_power': 55, 'power_mult': 2.0, 'base_speed': 400, 'speed_mult': 18, 'base_passes': 1, 'passes_mult': 0.2},
+        'foam': {'base_power': 55, 'power_mult': 2.0, 'base_speed': 400, 'speed_mult': 18, 'base_passes': 1, 'passes_mult': 0.2},
+        
+        # Mantar - orta
+        'mantar': {'base_power': 65, 'power_mult': 3.0, 'base_speed': 360, 'speed_mult': 22, 'base_passes': 1, 'passes_mult': 0.3},
+        'cork': {'base_power': 65, 'power_mult': 3.0, 'base_speed': 360, 'speed_mult': 22, 'base_passes': 1, 'passes_mult': 0.3},
+    }
     
+    # Default values
+    return params.get(material, {
+        'base_power': 75, 'power_mult': 3.5, 'base_speed': 320, 
+        'speed_mult': 25, 'base_passes': 2, 'passes_mult': 0.4
+    })
+
+
+def calculate_diode_cutting_params(material: str, thickness: float) -> ProcessParams:
+    """Calculate cutting parameters for diode laser"""
+    params = get_diode_material_params(material)
+    
+    # Calculate power (percentage)
+    power = params['base_power'] + (thickness * params['power_mult'])
     power = round(max(10, min(100, power)), 1)
-    speed = round(max(50, min(800, speed)), 0)
-    passes = min(10, passes)
+    
+    # Calculate speed (mm/min)
+    speed = params['base_speed'] - (thickness * params['speed_mult'])
+    speed = round(max(50, min(500, speed)), 0)
+    
+    # Calculate passes
+    passes = params['base_passes'] + int(thickness * params['passes_mult'])
+    passes = max(1, min(20, passes))
     
     return ProcessParams(power=power, speed=speed, passes=passes)
 
 
-def calculate_engraving_params(material: str, thickness: float) -> ProcessParams:
-    """Calculate engraving parameters (fallback)"""
-    base_power = 40 + (thickness * 2)
-    base_speed = 500 - (thickness * 15)
+def calculate_diode_engraving_params(material: str, thickness: float) -> ProcessParams:
+    """Calculate engraving parameters for diode laser"""
+    params = get_diode_material_params(material)
     
-    power = round(max(10, min(100, base_power)), 1)
-    speed = round(max(100, min(800, base_speed)), 0)
+    # Engraving uses lower power and faster speed
+    power = (params['base_power'] * 0.5) + (thickness * 1.5)
+    power = round(max(10, min(100, power)), 1)
     
-    return ProcessParams(power=power, speed=speed, passes=1)
+    speed = params['base_speed'] + 100  # Faster for engraving
+    speed = round(max(100, min(500, speed)), 0)
+    
+    passes = 1  # Usually single pass for engraving
+    
+    return ProcessParams(power=power, speed=speed, passes=passes)
 
 
-def calculate_scoring_params(material: str, thickness: float) -> ProcessParams:
-    """Calculate scoring parameters (fallback)"""
-    base_power = 55 + (thickness * 2.5)
-    base_speed = 400 - (thickness * 18)
+def calculate_diode_scoring_params(material: str, thickness: float) -> ProcessParams:
+    """Calculate scoring parameters for diode laser"""
+    params = get_diode_material_params(material)
     
-    power = round(max(10, min(100, base_power)), 1)
-    speed = round(max(80, min(700, base_speed)), 0)
+    # Scoring is between engraving and cutting
+    power = (params['base_power'] * 0.7) + (thickness * 2.5)
+    power = round(max(10, min(100, power)), 1)
     
-    return ProcessParams(power=power, speed=speed, passes=1)
+    speed = params['base_speed'] + 50
+    speed = round(max(80, min(500, speed)), 0)
+    
+    passes = max(1, int(thickness * 0.3))
+    passes = max(1, min(10, passes))
+    
+    return ProcessParams(power=power, speed=speed, passes=passes)
 
 
 # ============= API ENDPOINTS =============
@@ -173,8 +239,10 @@ async def root():
     
     return HealthResponse(
         status="healthy",
-        service="LaserTuner ML API",
-        version="3.0.0",
+        service="LaserTuner ML API - Diode Edition",
+        version="3.0.0-diode",
+        laserType="Diode Laser",
+        powerRange="2W - 40W",
         timestamp=datetime.utcnow().isoformat(),
         firebase_status="connected" if firebase.is_available() else "disconnected",
         total_experiments=stats.get('total_experiments', 0)
@@ -189,8 +257,10 @@ async def health_check():
     
     return HealthResponse(
         status="healthy",
-        service="LaserTuner ML API",
-        version="3.0.0",
+        service="LaserTuner ML API - Diode Edition",
+        version="3.0.0-diode",
+        laserType="Diode Laser",
+        powerRange="2W - 40W",
         timestamp=datetime.utcnow().isoformat(),
         firebase_status="connected" if firebase.is_available() else "disconnected",
         total_experiments=stats.get('total_experiments', 0)
@@ -205,7 +275,7 @@ async def get_statistics():
     if not firebase.is_available():
         return {
             "status": "firebase_unavailable",
-            "message": "Firebase connection not available",
+            "message": "Firebase bağlantısı mevcut değil",
             "using_fallback": True
         }
     
@@ -215,19 +285,32 @@ async def get_statistics():
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict(request: PredictionRequest):
-    """
-    Predict laser cutting parameters using REAL USER DATA
-    
-    NEW: Now uses verified experiments from Firestore!
-    Falls back to static algorithm if insufficient data.
-    """
+    """Predict diode laser cutting parameters using REAL USER DATA"""
     start_time = datetime.now()
     
     try:
         logger.info(
-            f"🔍 Prediction request: {request.materialType} "
-            f"{request.materialThickness}mm, processes: {request.processes}"
+            f"🔍 Diode Laser Prediction: {request.machineBrand} {request.laserPower}W, "
+            f"{request.materialType} {request.materialThickness}mm, "
+            f"processes: {request.processes}"
         )
+        
+        # Warnings for diode laser limitations
+        warnings = []
+        
+        # Check thickness
+        if request.materialThickness > 8:
+            warnings.append(
+                f"⚠️ {request.materialThickness}mm kalınlık diode lazer için zorlu olabilir. "
+                f"En iyi sonuç için 3-5mm önerilir."
+            )
+        
+        # Check power for thick materials
+        if request.materialThickness > 5 and request.laserPower < 20:
+            warnings.append(
+                f"⚠️ {request.laserPower}W güç {request.materialThickness}mm kesim için düşük olabilir. "
+                f"Daha fazla geçiş gerekebilir."
+            )
         
         # Get services
         firebase = get_firebase_service()
@@ -245,19 +328,19 @@ async def predict(request: PredictionRequest):
             similar_experiments = firebase.get_similar_experiments(
                 material_type=request.materialType,
                 thickness=request.materialThickness,
-                thickness_tolerance=2.0
+                thickness_tolerance=1.5  # Tighter tolerance for diode
             )
             logger.info(f"📊 Found {len(similar_experiments)} similar experiments")
         
         # Calculate parameters for each process
         for process_type in request.processes:
             if similar_experiments:
-                # Try ML prediction from real data
                 ml_result = ml_service.predict_from_data(
                     experiments=similar_experiments,
                     process_type=process_type,
                     material_type=request.materialType,
-                    thickness=request.materialThickness
+                    thickness=request.materialThickness,
+                    target_power=request.laserPower
                 )
                 
                 params_dict, confidence, notes = ml_result
@@ -267,19 +350,34 @@ async def predict(request: PredictionRequest):
                     predictions[process_type] = ProcessParams(**params_dict)
                     total_data_points = len(similar_experiments)
                     max_confidence = max(max_confidence, confidence)
-                    all_notes.append(f"{process_type.title()}: {notes}")
+                    all_notes.append(notes)
                     data_sources.add("user_data")
-                    logger.info(f"✅ {process_type}: Using ML prediction (confidence: {confidence})")
+                    logger.info(
+                        f"✅ {process_type}: Using ML prediction (confidence: {confidence})"
+                    )
                     continue
             
-            # Fallback to static algorithm
-            logger.info(f"⚠️ {process_type}: Insufficient data, using static algorithm")
-            params = ml_service.get_fallback_prediction(
-                material_type=request.materialType,
-                thickness=request.materialThickness,
-                process_type=process_type
+            # Fallback to diode-specific algorithm
+            logger.info(
+                f"⚠️ {process_type}: Insufficient data, using diode laser algorithm"
             )
-            predictions[process_type] = ProcessParams(**params)
+            
+            if process_type == 'cutting':
+                params = calculate_diode_cutting_params(
+                    request.materialType, request.materialThickness
+                )
+            elif process_type == 'engraving':
+                params = calculate_diode_engraving_params(
+                    request.materialType, request.materialThickness
+                )
+            elif process_type == 'scoring':
+                params = calculate_diode_scoring_params(
+                    request.materialType, request.materialThickness
+                )
+            else:
+                params = ProcessParams(power=50.0, speed=300.0, passes=2)
+            
+            predictions[process_type] = params
             data_sources.add("static_algorithm")
         
         # Determine final confidence and notes
@@ -288,9 +386,9 @@ async def predict(request: PredictionRequest):
             final_notes = " | ".join(all_notes)
             data_source = "hybrid" if "static_algorithm" in data_sources else "user_data"
         else:
-            confidence_score = 0.50
+            confidence_score = 0.55
             final_notes = (
-                "⚠️ Yetersiz topluluk verisi, temel algoritma kullanıldı. "
+                "⚠️ Yetersiz topluluk verisi, diode lazer algoritması kullanıldı. "
                 "Daha iyi sonuçlar için benzer deneyler ekleyin!"
             )
             data_source = "static_algorithm"
@@ -301,7 +399,8 @@ async def predict(request: PredictionRequest):
             confidenceScore=confidence_score,
             notes=final_notes,
             dataPointsUsed=total_data_points,
-            dataSource=data_source
+            dataSource=data_source,
+            warnings=warnings
         )
         
         duration = (datetime.now() - start_time).total_seconds()
@@ -334,18 +433,57 @@ async def test_endpoint():
     
     return {
         "status": "ok",
-        "version": "3.0.0",
-        "message": "API is working with ML predictions!",
+        "version": "3.0.0-diode",
+        "laser_type": "Diode Laser",
+        "power_range": "2W - 40W",
+        "message": "Diode Laser API çalışıyor!",
         "firebase_connected": firebase.is_available(),
         "total_experiments": stats.get('total_experiments', 0),
         "verified_experiments": stats.get('verified_experiments', 0),
+        "supported_materials": [
+            "Ahşap (Wood)", "MDF", "Karton (Cardboard)", "Deri (Leather)",
+            "Keçe (Felt)", "Kumaş (Fabric)", "Kağıt (Paper)", 
+            "Köpük (Foam)", "Mantar (Cork)"
+        ],
         "example_request": {
-            "machineBrand": "Epilog Laser Fusion Pro",
-            "laserPower": 100,
+            "machineBrand": "xTool D1 Pro",
+            "laserPower": 20,
             "materialType": "Ahşap",
-            "materialThickness": 5,
+            "materialThickness": 3,
             "processes": ["cutting", "engraving"]
         }
+    }
+
+
+@app.get("/materials")
+async def get_supported_materials():
+    """Get list of supported materials for diode laser"""
+    return {
+        "supported_materials": {
+            "organic": [
+                {"name": "Ahşap (Wood)", "turkish": "Ahşap", "english": "Wood", "max_thickness": 8},
+                {"name": "MDF", "turkish": "MDF", "english": "MDF", "max_thickness": 6},
+                {"name": "Karton (Cardboard)", "turkish": "Karton", "english": "Cardboard", "max_thickness": 5},
+                {"name": "Deri (Leather)", "turkish": "Deri", "english": "Leather", "max_thickness": 5},
+                {"name": "Keçe (Felt)", "turkish": "Keçe", "english": "Felt", "max_thickness": 4},
+                {"name": "Kumaş (Fabric)", "turkish": "Kumaş", "english": "Fabric", "max_thickness": 3},
+                {"name": "Kağıt (Paper)", "turkish": "Kağıt", "english": "Paper", "max_thickness": 2},
+                {"name": "Köpük (Foam)", "turkish": "Köpük", "english": "Foam", "max_thickness": 10},
+                {"name": "Mantar (Cork)", "turkish": "Mantar", "english": "Cork", "max_thickness": 6}
+            ]
+        },
+        "not_supported": [
+            "Akrilik/Plexiglass (CO2 lazer gerektirir)",
+            "Metal (Fiber lazer gerektirir)",
+            "Cam (Fiber lazer gerektirir)",
+            "Seramik"
+        ],
+        "notes": [
+            "Diode lazerler 2W-40W güç aralığında çalışır",
+            "En iyi sonuçlar 3-5mm kalınlıkta alınır",
+            "8mm üzeri kesim çok zordur ve önerilmez",
+            "Organik malzemeler (ahşap, deri, kağıt) en iyi sonuçları verir"
+        ]
     }
 
 
@@ -355,7 +493,8 @@ async def test_endpoint():
 async def startup_event():
     """Initialize services on startup"""
     logger.info("="*50)
-    logger.info("🚀 LaserTuner ML API v3.0 Starting...")
+    logger.info("🚀 LaserTuner ML API v3.0 - DIODE LASER EDITION")
+    logger.info("⚡ Power Range: 2W - 40W")
     logger.info(f"Allowed Origins: {ALLOWED_ORIGINS}")
     
     # Initialize Firebase
@@ -366,7 +505,7 @@ async def startup_event():
         logger.info(f"📊 Total experiments: {stats.get('total_experiments', 0)}")
         logger.info(f"✅ Verified experiments: {stats.get('verified_experiments', 0)}")
     else:
-        logger.warning("⚠️ Firebase not available - using fallback algorithms only")
+        logger.warning("⚠️ Firebase not available - using diode laser algorithms only")
     
     logger.info("="*50)
 
@@ -385,7 +524,7 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
     
-    logger.info(f"Starting server on {host}:{port}")
+    logger.info(f"Starting Diode Laser API on {host}:{port}")
     
     uvicorn.run(
         "main:app",

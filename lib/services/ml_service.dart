@@ -94,7 +94,7 @@ class MLService {
 
   /// Fallback: Basit tahmin (API çalışmazsa)
   PredictionResponse generateFallbackPrediction(PredictionRequest request) {
-    print('⚠️ Using fallback prediction algorithm');
+    print('⚠️ Using DIODE LASER fallback prediction algorithm');
 
     Map<String, ProcessParams> predictions = {};
     double thickness = request.materialThickness;
@@ -105,27 +105,33 @@ class MLService {
       switch (processType) {
         case 'cutting':
           params = ProcessParams(
-            power: _calculateCuttingPower(request.materialType, thickness),
-            speed: _calculateCuttingSpeed(request.materialType, thickness),
-            passes: _calculatePasses(thickness),
+            power: _calculateDiodeCuttingPower(request.materialType, thickness),
+            speed: _calculateDiodeCuttingSpeed(request.materialType, thickness),
+            passes: _calculateDiodePasses(thickness),
           );
           break;
         case 'engraving':
           params = ProcessParams(
-            power: _calculateEngravingPower(request.materialType, thickness),
-            speed: _calculateEngravingSpeed(request.materialType, thickness),
+            power: _calculateDiodeEngravingPower(
+              request.materialType,
+              thickness,
+            ),
+            speed: _calculateDiodeEngravingSpeed(
+              request.materialType,
+              thickness,
+            ),
             passes: 1,
           );
           break;
         case 'scoring':
           params = ProcessParams(
-            power: _calculateScoringPower(request.materialType, thickness),
-            speed: _calculateScoringSpeed(request.materialType, thickness),
+            power: _calculateDiodeScoringPower(request.materialType, thickness),
+            speed: _calculateDiodeScoringSpeed(request.materialType, thickness),
             passes: 1,
           );
           break;
         default:
-          params = ProcessParams(power: 50, speed: 300, passes: 1);
+          params = ProcessParams(power: 60, speed: 250, passes: 2);
       }
 
       predictions[processType] = params;
@@ -135,15 +141,15 @@ class MLService {
       predictions: predictions,
       confidenceScore: 0.5,
       notes:
-          '⚠️ API bağlantısı kurulamadı, basit algoritma kullanıldı. '
-          'İnternet bağlantınızı kontrol edin veya daha sonra tekrar deneyin.',
-      dataPointsUsed: 0, // ✨ EKLENDİ
-      dataSource: 'static_algorithm', // ✨ EKLENDİ
+          '⚠️ API bağlantısı kurulamadı, diode lazer algoritması kullanıldı. '
+          'İnternet bağlantınızı kontrol edin.',
+      dataPointsUsed: 0,
+      dataSource: 'static_algorithm',
     );
   }
 
-  // Materyal bazlı hesaplama yardımcıları
-  double _calculateCuttingPower(String material, double thickness) {
+  // ✨ DIODE LASER SPECIFIC CALCULATIONS
+  double _calculateDiodeCuttingPower(String material, double thickness) {
     double basePower;
     double multiplier;
 
@@ -151,39 +157,61 @@ class MLService {
       case 'ahşap':
       case 'ahsap':
       case 'wood':
-        basePower = 65;
-        multiplier = 3.0;
+        basePower = 80;
+        multiplier = 4.0;
         break;
       case 'mdf':
-        basePower = 70;
-        multiplier = 3.5;
-        break;
-      case 'plexiglass':
-      case 'akrilik':
-      case 'acrylic':
-        basePower = 55;
-        multiplier = 2.5;
+        basePower = 85;
+        multiplier = 4.5;
         break;
       case 'karton':
       case 'cardboard':
-        basePower = 35;
-        multiplier = 2.0;
+        basePower = 50;
+        multiplier = 3.0;
         break;
       case 'deri':
       case 'leather':
+        basePower = 70;
+        multiplier = 3.5;
+        break;
+      case 'keçe':
+      case 'felt':
+        basePower = 60;
+        multiplier = 2.5;
+        break;
+      case 'kumaş':
+      case 'kumas':
+      case 'fabric':
+        basePower = 45;
+        multiplier = 2.0;
+        break;
+      case 'kağıt':
+      case 'kagit':
+      case 'paper':
         basePower = 40;
         multiplier = 1.5;
         break;
-      default:
-        basePower = 60;
+      case 'köpük':
+      case 'kopuk':
+      case 'foam':
+        basePower = 55;
+        multiplier = 2.0;
+        break;
+      case 'mantar':
+      case 'cork':
+        basePower = 65;
         multiplier = 3.0;
+        break;
+      default:
+        basePower = 75;
+        multiplier = 3.5;
     }
 
     double power = basePower + (thickness * multiplier);
     return power.clamp(10, 100);
   }
 
-  double _calculateCuttingSpeed(String material, double thickness) {
+  double _calculateDiodeCuttingSpeed(String material, double thickness) {
     double baseSpeed;
     double reduction;
 
@@ -191,58 +219,95 @@ class MLService {
       case 'ahşap':
       case 'ahsap':
       case 'wood':
-        baseSpeed = 320;
-        reduction = 18;
+        baseSpeed = 300;
+        reduction = 30;
         break;
       case 'mdf':
-        baseSpeed = 300;
-        reduction = 20;
-        break;
-      case 'plexiglass':
-      case 'akrilik':
-      case 'acrylic':
-        baseSpeed = 380;
-        reduction = 25;
+        baseSpeed = 280;
+        reduction = 35;
         break;
       case 'karton':
       case 'cardboard':
-        baseSpeed = 450;
-        reduction = 15;
+        baseSpeed = 400;
+        reduction = 25;
         break;
       case 'deri':
       case 'leather':
+        baseSpeed = 350;
+        reduction = 28;
+        break;
+      case 'keçe':
+      case 'felt':
+        baseSpeed = 380;
+        reduction = 20;
+        break;
+      case 'kumaş':
+      case 'kumas':
+      case 'fabric':
+        baseSpeed = 420;
+        reduction = 15;
+        break;
+      case 'kağıt':
+      case 'kagit':
+      case 'paper':
+        baseSpeed = 450;
+        reduction = 10;
+        break;
+      case 'köpük':
+      case 'kopuk':
+      case 'foam':
         baseSpeed = 400;
-        reduction = 12;
+        reduction = 18;
+        break;
+      case 'mantar':
+      case 'cork':
+        baseSpeed = 360;
+        reduction = 22;
         break;
       default:
         baseSpeed = 320;
-        reduction = 18;
+        reduction = 25;
     }
 
     double speed = baseSpeed - (thickness * reduction);
-    return speed.clamp(50, 600);
+    return speed.clamp(50, 500); // Diode max 500mm/min
   }
 
-  double _calculateEngravingPower(String material, double thickness) {
-    return (_calculateCuttingPower(material, thickness) * 0.55).clamp(10, 100);
+  double _calculateDiodeEngravingPower(String material, double thickness) {
+    return (_calculateDiodeCuttingPower(material, thickness) * 0.5).clamp(
+      10,
+      100,
+    );
   }
 
-  double _calculateEngravingSpeed(String material, double thickness) {
-    return (_calculateCuttingSpeed(material, thickness) * 1.6).clamp(100, 800);
+  double _calculateDiodeEngravingSpeed(String material, double thickness) {
+    return (_calculateDiodeCuttingSpeed(material, thickness) + 100).clamp(
+      100,
+      500,
+    );
   }
 
-  double _calculateScoringPower(String material, double thickness) {
-    return (_calculateCuttingPower(material, thickness) * 0.75).clamp(10, 100);
+  double _calculateDiodeScoringPower(String material, double thickness) {
+    return (_calculateDiodeCuttingPower(material, thickness) * 0.7).clamp(
+      10,
+      100,
+    );
   }
 
-  double _calculateScoringSpeed(String material, double thickness) {
-    return (_calculateCuttingSpeed(material, thickness) * 1.3).clamp(80, 700);
+  double _calculateDiodeScoringSpeed(String material, double thickness) {
+    return (_calculateDiodeCuttingSpeed(material, thickness) + 50).clamp(
+      80,
+      500,
+    );
   }
 
-  int _calculatePasses(double thickness) {
-    if (thickness <= 3) return 1;
-    if (thickness <= 6) return 2;
-    if (thickness <= 10) return 3;
-    return 4;
+  int _calculateDiodePasses(double thickness) {
+    if (thickness <= 2) return 2;
+    if (thickness <= 4) return 3;
+    if (thickness <= 6) return 4;
+    if (thickness <= 8) return 6;
+    return 8; // Max for diode
   }
+
+  // Materyal bazlı hesaplama yardımcıları
 }

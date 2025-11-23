@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lasertuner/config/app_config.dart';
 import '../models/prediction_model.dart';
 import '../models/experiment_model.dart';
 import '../services/ml_service.dart';
@@ -37,24 +38,32 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
   // Popüler seçenekler
   final List<String> popularMachines = [
-    'Epilog Laser Fusion Pro',
-    'Trotec Speedy 400',
-    'Universal Laser Systems',
-    'Thunder Laser',
+    'xTool D1 Pro',
+    'Atomstack A5',
+    'Ortur Laser Master 3',
+    'Sculpfun S9',
+    'Creality Falcon',
+    'TwoTrees',
     'Diğer',
   ];
 
   final List<String> popularMaterials = [
     'Ahşap',
     'MDF',
-    'Plexiglass',
     'Karton',
     'Deri',
+    'Keçe',
+    'Kumaş',
+    'Kağıt',
+    'Köpük',
+    'Mantar',
     'Diğer',
   ];
 
-  final List<double> popularPowers = [40, 60, 80, 100, 130];
-  final List<double> popularThickness = [3, 4, 5, 6, 8, 10];
+  final List<double> popularPowers = [5, 10, 15, 20, 30, 40];
+
+  // ✨ THINNER MATERIALS
+  final List<double> popularThickness = [1, 2, 3, 4, 5, 6, 8];
 
   @override
   void initState() {
@@ -119,6 +128,51 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     }
   }
 
+  bool _validateMaterial(String material) {
+    // Check if material is unsupported
+    for (String unsupported in AppConfig.UNSUPPORTED_MATERIALS) {
+      if (material.toLowerCase().contains(unsupported.toLowerCase())) {
+        _showSnackBar(
+          '⚠️ $material diode lazer için uygun değil! CO2 lazer gerektirir.',
+          backgroundColor: Colors.red,
+        );
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool _validatePowerAndThickness() {
+    final power = double.tryParse(_laserPowerController.text) ?? 0;
+    final thickness = double.tryParse(_thicknessController.text) ?? 0;
+
+    if (power < AppConfig.MIN_LASER_POWER ||
+        power > AppConfig.MAX_LASER_POWER) {
+      _showSnackBar(
+        '⚠️ Lazer gücü ${AppConfig.MIN_LASER_POWER}W - ${AppConfig.MAX_LASER_POWER}W arasında olmalı!',
+        backgroundColor: Colors.red,
+      );
+      return false;
+    }
+
+    if (thickness > AppConfig.MAX_THICKNESS) {
+      _showSnackBar(
+        '⚠️ Diode lazerler max ${AppConfig.MAX_THICKNESS}mm kesebilir! Daha ince malzeme seçin.',
+        backgroundColor: Colors.orange,
+      );
+      return false;
+    }
+
+    if (thickness > 6) {
+      _showSnackBar(
+        'ℹ️ ${thickness}mm kalınlık zor olabilir. ${power}W diode lazer için ideal: 2-5mm',
+        backgroundColor: Colors.orange,
+      );
+    }
+
+    return true;
+  }
+
   void _getPrediction() {
     // Validasyon
     if (_machineBrandController.text.isEmpty ||
@@ -129,14 +183,22 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
       return;
     }
 
+    // ✨ NEW: Material validation
+    if (!_validateMaterial(_materialTypeController.text)) {
+      return;
+    }
+
+    // ✨ NEW: Power & thickness validation
+    if (!_validatePowerAndThickness()) {
+      return;
+    }
+
     if (!_selectedProcesses.containsValue(true)) {
       _showSnackBar('En az bir işlem tipi seçin');
       return;
     }
 
     setState(() => _isLoading = true);
-
-    // Async işlemleri buradan başlat
     _performPrediction();
   }
 
@@ -464,9 +526,9 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
           (context) => AlertDialog(
             title: const Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.green),
+                Icon(Icons.info_outline, color: Colors.blue),
                 SizedBox(width: 12),
-                Text('API Bilgisi'),
+                Text('Diode Laser API'),
               ],
             ),
             content: Column(
@@ -474,7 +536,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Bu uygulama Render.com üzerinde barındırılan bir ML API kullanır.',
+                  'Bu uygulama Diode Lazer (2W-40W) için optimize edilmiştir.',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 12),
@@ -487,31 +549,45 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                   style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
                 ),
                 const SizedBox(height: 12),
-                const Text('Özellikler:'),
-                const Text('• Cloud-based ML tahminleri'),
-                const Text('• Offline fallback desteği'),
-                const Text('• Gerçek zamanlı sağlık kontrolü'),
+                const Text('✅ Desteklenen Malzemeler:'),
+                ...AppConfig.SUPPORTED_MATERIALS
+                    .map((m) => Text('  • $m'))
+                    .toList(),
+                const SizedBox(height: 8),
+                const Text(
+                  '❌ Desteklenmeyen:',
+                  style: TextStyle(color: Colors.red),
+                ),
+                ...AppConfig.UNSUPPORTED_MATERIALS
+                    .map(
+                      (m) => Text(
+                        '  • $m (CO2 gerektirir)',
+                        style: TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    )
+                    .toList(),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: Colors.orange.shade50,
                     borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
                   ),
                   child: Row(
                     children: [
                       Icon(
-                        Icons.schedule,
+                        Icons.warning_amber,
                         size: 16,
-                        color: Colors.blue.shade700,
+                        color: Colors.orange.shade700,
                       ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'İlk istek 30-60 saniye sürebilir (cold start)',
+                          'Diode lazerler max 6-8mm ahşap kesebilir',
                           style: TextStyle(
                             fontSize: 11,
-                            color: Colors.blue.shade700,
+                            color: Colors.orange.shade700,
                           ),
                         ),
                       ),
