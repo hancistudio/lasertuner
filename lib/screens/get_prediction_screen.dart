@@ -3,6 +3,7 @@ import 'package:lasertuner/config/app_config.dart';
 import '../models/prediction_model.dart';
 import '../models/experiment_model.dart';
 import '../services/ml_service.dart';
+import '../services/gemini_ai_service.dart';
 import '../widgets/custom_button.dart';
 
 class GetPredictionScreen extends StatefulWidget {
@@ -14,19 +15,23 @@ class GetPredictionScreen extends StatefulWidget {
 
 class _GetPredictionScreenState extends State<GetPredictionScreen>
     with SingleTickerProviderStateMixin {
-  // ✅ RENDER.COM API URL
-  static const String API_URL = 'https://lasertuner-ml-api.onrender.com';
-
+  // ✅ Services
   final MLService _mlService = MLService();
+  final GeminiAIService _geminiService = GeminiAIService();
+
+  // ✅ Controllers
   final TextEditingController _machineBrandController = TextEditingController();
   final TextEditingController _laserPowerController = TextEditingController();
   final TextEditingController _materialTypeController = TextEditingController();
   final TextEditingController _thicknessController = TextEditingController();
 
+  // ✅ State
   bool _isLoading = false;
   bool _apiHealthy = false;
   bool _isCheckingHealth = true;
-  PredictionResponse? _predictionResult;
+  PredictionResponse? _mlPrediction;
+  PredictionResponse? _geminiPrediction;
+  String? _selectedPredictionSource; // 'ml' veya 'gemini'
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -36,7 +41,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     'scoring': false,
   };
 
-  // Popüler seçenekler
+  // ✅ Popüler seçenekler
   final List<String> popularMachines = [
     'xTool D1 Pro',
     'Atomstack A5',
@@ -61,8 +66,6 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
   ];
 
   final List<double> popularPowers = [5, 10, 15, 20, 30, 40];
-
-  // ✨ THINNER MATERIALS
   final List<double> popularThickness = [1, 2, 3, 4, 5, 6, 8];
 
   @override
@@ -92,7 +95,6 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     setState(() => _isCheckingHealth = true);
 
     try {
-      print('🔍 Checking API health...');
       final isHealthy = await _mlService.checkHealth();
 
       if (mounted) {
@@ -108,41 +110,48 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
           );
         } else {
           _showSnackBar(
-            '⚠️ ML servisi yanıt vermiyor. Fallback mode aktif.',
+            '⚠️ ML servisi yanıt vermiyor. Gemini AI kullanılabilir.',
             backgroundColor: Colors.orange,
           );
         }
       }
     } catch (e) {
-      print('❌ Health check error: $e');
       if (mounted) {
         setState(() {
           _apiHealthy = false;
           _isCheckingHealth = false;
         });
         _showSnackBar(
-          '⚠️ API bağlantısı kurulamadı. Yerel tahmin kullanılacak.',
+          '⚠️ API bağlantısı kurulamadı. Gemini AI kullanın.',
           backgroundColor: Colors.orange,
         );
       }
     }
   }
 
-  bool _validateMaterial(String material) {
-    // Check if material is unsupported
+  bool _validateInputs() {
+    if (_machineBrandController.text.isEmpty ||
+        _laserPowerController.text.isEmpty ||
+        _materialTypeController.text.isEmpty ||
+        _thicknessController.text.isEmpty) {
+      _showSnackBar('❌ Lütfen tüm alanları doldurun');
+      return false;
+    }
+
+    // Malzeme kontrolü
     for (String unsupported in AppConfig.UNSUPPORTED_MATERIALS) {
-      if (material.toLowerCase().contains(unsupported.toLowerCase())) {
+      if (_materialTypeController.text.toLowerCase().contains(
+        unsupported.toLowerCase(),
+      )) {
         _showSnackBar(
-          '⚠️ $material diode lazer için uygun değil! CO2 lazer gerektirir.',
+          '⚠️ ${_materialTypeController.text} diode lazer için uygun değil! CO2 lazer gerektirir.',
           backgroundColor: Colors.red,
         );
         return false;
       }
     }
-    return true;
-  }
 
-  bool _validatePowerAndThickness() {
+    // Güç ve kalınlık kontrolü
     final power = double.tryParse(_laserPowerController.text) ?? 0;
     final thickness = double.tryParse(_thicknessController.text) ?? 0;
 
@@ -157,106 +166,137 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
     if (thickness > AppConfig.MAX_THICKNESS) {
       _showSnackBar(
-        '⚠️ Diode lazerler max ${AppConfig.MAX_THICKNESS}mm kesebilir! Daha ince malzeme seçin.',
+        '⚠️ Diode lazerler max ${AppConfig.MAX_THICKNESS}mm kesebilir!',
         backgroundColor: Colors.orange,
       );
       return false;
     }
 
-    if (thickness > 6) {
-      _showSnackBar(
-        'ℹ️ ${thickness}mm kalınlık zor olabilir. ${power}W diode lazer için ideal: 2-5mm',
-        backgroundColor: Colors.orange,
-      );
+    if (!_selectedProcesses.containsValue(true)) {
+      _showSnackBar('❌ En az bir işlem tipi seçin');
+      return false;
     }
 
     return true;
   }
 
-  void _getPrediction() {
-    // Validasyon
-    if (_machineBrandController.text.isEmpty ||
-        _laserPowerController.text.isEmpty ||
-        _materialTypeController.text.isEmpty ||
-        _thicknessController.text.isEmpty) {
-      _showSnackBar('Lütfen tüm alanları doldurun');
-      return;
-    }
+  // 🤖 ML API ile tahmin al
+  Future<void> _getPredictionFromML() async {
+    if (!_validateInputs()) return;
 
-    // ✨ NEW: Material validation
-    if (!_validateMaterial(_materialTypeController.text)) {
-      return;
-    }
+    setState(() {
+      _isLoading = true;
+      _mlPrediction = null;
+      _selectedPredictionSource = 'ml';
+    });
 
-    // ✨ NEW: Power & thickness validation
-    if (!_validatePowerAndThickness()) {
-      return;
-    }
+    try {
+      final request = _buildPredictionRequest();
+      final response = await _mlService.getPrediction(request);
 
-    if (!_selectedProcesses.containsValue(true)) {
-      _showSnackBar('En az bir işlem tipi seçin');
-      return;
-    }
+      setState(() {
+        _mlPrediction = response;
+      });
 
-    setState(() => _isLoading = true);
-    _performPrediction();
+      _animationController.forward(from: 0);
+      _showSnackBar(
+        '✅ ML tahmini başarıyla alındı!',
+        backgroundColor: Colors.green,
+      );
+    } catch (e) {
+      print('❌ ML prediction error: $e');
+      _showSnackBar('❌ ML tahmini alınamadı: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
-  Future<void> _performPrediction() async {
+  // 🧠 Gemini AI ile tahmin al
+  Future<void> _getPredictionFromGemini() async {
+    if (!_validateInputs()) return;
+
+    setState(() {
+      _isLoading = true;
+      _geminiPrediction = null;
+      _selectedPredictionSource = 'gemini';
+    });
+
     try {
-      List<String> selectedProcessList =
-          _selectedProcesses.entries
-              .where((entry) => entry.value)
-              .map((entry) => entry.key)
-              .toList();
+      final request = _buildPredictionRequest();
+      final response = await _geminiService.getPredictionWithGemini(request);
 
-      final request = PredictionRequest(
-        machineBrand: _machineBrandController.text,
-        laserPower: double.parse(_laserPowerController.text),
-        materialType: _materialTypeController.text,
-        materialThickness: double.parse(_thicknessController.text),
-        processes: selectedProcessList,
+      setState(() {
+        _geminiPrediction = response;
+      });
+
+      _animationController.forward(from: 0);
+      _showSnackBar(
+        '✅ Gemini AI tahmini başarıyla alındı!',
+        backgroundColor: Colors.purple,
       );
-
-      PredictionResponse response;
-
-      // API'yi dene, başarısız olursa fallback kullan
-      try {
-        print('📤 Sending request to API...');
-        response = await _mlService.getPrediction(request);
-        print('✅ Prediction received from API');
-
-        setState(() {
-          _predictionResult = response;
-        });
-
-        _animationController.forward(from: 0);
-        _showSnackBar(
-          '✅ Tahmin başarıyla alındı!',
-          backgroundColor: Colors.green,
-        );
-      } catch (apiError) {
-        print('❌ API error, using fallback: $apiError');
-
-        // Fallback kullan
-        response = _mlService.generateFallbackPrediction(request);
-
-        setState(() {
-          _predictionResult = response;
-        });
-
-        _animationController.forward(from: 0);
-        _showSnackBar(
-          '⚠️ API kullanılamadı, yerel tahmin kullanıldı',
-          backgroundColor: Colors.orange,
-        );
-      }
     } catch (e) {
-      print('❌ Prediction error: $e');
-      _showSnackBar('Hata: ${e.toString()}');
+      print('❌ Gemini prediction error: $e');
+      _showSnackBar('❌ Gemini AI tahmini alınamadı: $e');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
     }
+  }
+
+  // 🔀 Her iki tahmini karşılaştır
+  Future<void> _getComparativePredictions() async {
+    if (!_validateInputs()) return;
+
+    setState(() {
+      _isLoading = true;
+      _mlPrediction = null;
+      _geminiPrediction = null;
+      _selectedPredictionSource = 'both';
+    });
+
+    try {
+      final request = _buildPredictionRequest();
+
+      // Paralel olarak her iki tahmini al
+      final results = await Future.wait([
+        _mlService.getPrediction(request).catchError((e) {
+          print('ML error: $e');
+          return _mlService.generateFallbackPrediction(request);
+        }),
+        _geminiService.getPredictionWithGemini(request),
+      ]);
+
+      setState(() {
+        _mlPrediction = results[0];
+        _geminiPrediction = results[1];
+      });
+
+      _animationController.forward(from: 0);
+      _showSnackBar(
+        '✅ Her iki tahmin de alındı! Karşılaştırabilirsiniz.',
+        backgroundColor: Colors.blue,
+      );
+    } catch (e) {
+      print('❌ Comparative prediction error: $e');
+      _showSnackBar('❌ Tahminler alınamadı: $e');
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  PredictionRequest _buildPredictionRequest() {
+    List<String> selectedProcessList =
+        _selectedProcesses.entries
+            .where((entry) => entry.value)
+            .map((entry) => entry.key)
+            .toList();
+
+    return PredictionRequest(
+      machineBrand: _machineBrandController.text,
+      laserPower: double.parse(_laserPowerController.text),
+      materialType: _materialTypeController.text,
+      materialThickness: double.parse(_thicknessController.text),
+      processes: selectedProcessList,
+    );
   }
 
   void _showSnackBar(String message, {Color? backgroundColor}) {
@@ -287,7 +327,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          // API Status Indicator
+          // API Status
           if (_isCheckingHealth)
             const Padding(
               padding: EdgeInsets.all(16.0),
@@ -301,24 +341,18 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               ),
             )
           else
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: IconButton(
-                icon: Icon(
-                  _apiHealthy ? Icons.cloud_done : Icons.cloud_off,
-                  color: _apiHealthy ? Colors.white : Colors.orange,
-                ),
-                onPressed: _checkApiHealth,
-                tooltip:
-                    _apiHealthy
-                        ? 'ML Servisi Aktif\n$API_URL'
-                        : 'ML Servisi Bağlantı Yok\nTekrar dene',
+            IconButton(
+              icon: Icon(
+                _apiHealthy ? Icons.cloud_done : Icons.cloud_off,
+                color: _apiHealthy ? Colors.white : Colors.orange,
               ),
+              onPressed: _checkApiHealth,
+              tooltip:
+                  _apiHealthy ? 'ML Servisi Aktif' : 'ML Servisi Bağlantı Yok',
             ),
-          // Info button
           IconButton(
             icon: const Icon(Icons.info_outline, color: Colors.white),
-            onPressed: () => _showInfoDialog(),
+            onPressed: _showInfoDialog,
           ),
         ],
       ),
@@ -331,105 +365,13 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // API Status Card
-                if (!_apiHealthy && !_isCheckingHealth)
-                  Card(
-                    color: Colors.orange.shade50,
-                    elevation: 2,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.warning_amber_rounded,
-                            color: Colors.orange.shade700,
-                            size: 32,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'API Bağlantısı Yok',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                    color: Colors.orange.shade900,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Yerel tahmin algoritması kullanılacak. '
-                                  'İnternet bağlantınızı kontrol edin.',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.orange.shade800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: _checkApiHealth,
-                            child: const Text('Tekrar Dene'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+                if (!_apiHealthy && !_isCheckingHealth) _buildApiStatusCard(),
 
-                // Bilgilendirme kartı
-                Card(
-                  color: Colors.green.shade50,
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.lightbulb_outline,
-                          color: Colors.green.shade700,
-                          size: 32,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Akıllı Tahmin Sistemi',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Colors.green.shade900,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Topluluk verilerinden öğrenen ML modeli ile '
-                                'en uygun parametreleri tahmin ediyoruz.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.green.shade800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                // Info Card
+                _buildInfoCard(isDark),
                 const SizedBox(height: 24),
 
-                // Makine bilgileri
+                // Makine Bilgileri
                 _buildSectionCard(
                   title: '🔧 Makine Bilgileri',
                   isDark: isDark,
@@ -452,7 +394,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                 ),
                 const SizedBox(height: 16),
 
-                // Malzeme bilgileri
+                // Malzeme Bilgileri
                 _buildSectionCard(
                   title: '📦 Malzeme Bilgileri',
                   isDark: isDark,
@@ -475,7 +417,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                 ),
                 const SizedBox(height: 16),
 
-                // İşlem tipleri
+                // İşlem Tipleri
                 _buildSectionCard(
                   title: '⚙️ İşlem Tipleri',
                   isDark: isDark,
@@ -496,15 +438,11 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                 ),
                 const SizedBox(height: 24),
 
-                // Tahmin butonu
-                CustomButton(
-                  text: '🎯 Tahmini Getir',
-                  onPressed: _isLoading ? null : _getPrediction,
-                  isLoading: _isLoading,
-                ),
+                // 🎯 TAHMİN BUTONLARI
+                _buildPredictionButtons(isLargeScreen),
 
                 // Sonuçlar
-                if (_predictionResult != null) ...[
+                if (_mlPrediction != null || _geminiPrediction != null) ...[
                   const SizedBox(height: 24),
                   FadeTransition(
                     opacity: _fadeAnimation,
@@ -519,6 +457,135 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     );
   }
 
+  // 🎯 TAHMİN BUTONLARI
+  Widget _buildPredictionButtons(bool isLargeScreen) {
+    return Column(
+      children: [
+        // ML API Butonu
+        CustomButton(
+          text: '🤖 ML API ile Tahmin Al',
+          onPressed: _isLoading ? null : _getPredictionFromML,
+          isLoading: _isLoading && _selectedPredictionSource == 'ml',
+          backgroundColor: Colors.green,
+        ),
+        const SizedBox(height: 12),
+
+        // Gemini AI Butonu
+        CustomButton(
+          text: '🧠 Gemini AI ile Tahmin Al',
+          onPressed: _isLoading ? null : _getPredictionFromGemini,
+          isLoading: _isLoading && _selectedPredictionSource == 'gemini',
+          backgroundColor: Colors.purple,
+        ),
+        const SizedBox(height: 12),
+
+        // Karşılaştırmalı Tahmin Butonu
+        CustomButton(
+          text: '🔀 Her İkisini Karşılaştır',
+          onPressed: _isLoading ? null : _getComparativePredictions,
+          isLoading: _isLoading && _selectedPredictionSource == 'both',
+          backgroundColor: Colors.blue,
+        ),
+      ],
+    );
+  }
+
+  // API Status Card
+  Widget _buildApiStatusCard() {
+    return Card(
+      color: Colors.orange.shade50,
+      elevation: 2,
+      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange.shade700,
+              size: 32,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ML API Bağlantısı Yok',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.orange.shade900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Gemini AI kullanabilir veya bağlantıyı tekrar deneyebilirsiniz.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.orange.shade800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: _checkApiHealth,
+              child: const Text('Tekrar Dene'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Info Card
+  Widget _buildInfoCard(bool isDark) {
+    return Card(
+      color: Colors.green.shade50,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(
+              Icons.lightbulb_outline,
+              color: Colors.green.shade700,
+              size: 32,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Akıllı Tahmin Sistemi',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.green.shade900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'ML API (topluluk verisi) veya Gemini AI (yapay zeka) ile tahmin alın.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.green.shade800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Info Dialog
   void _showInfoDialog() {
     showDialog(
       context: context,
@@ -528,73 +595,62 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               children: [
                 Icon(Icons.info_outline, color: Colors.blue),
                 SizedBox(width: 12),
-                Text('Diode Laser API'),
+                Text('Tahmin Kaynakları'),
               ],
             ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Bu uygulama Diode Lazer (2W-40W) için optimize edilmiştir.',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'API URL:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                SelectableText(
-                  API_URL,
-                  style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-                ),
-                const SizedBox(height: 12),
-                const Text('✅ Desteklenen Malzemeler:'),
-                ...AppConfig.SUPPORTED_MATERIALS
-                    .map((m) => Text('  • $m'))
-                    .toList(),
-                const SizedBox(height: 8),
-                const Text(
-                  '❌ Desteklenmeyen:',
-                  style: TextStyle(color: Colors.red),
-                ),
-                ...AppConfig.UNSUPPORTED_MATERIALS
-                    .map(
-                      (m) => Text(
-                        '  • $m (CO2 gerektirir)',
-                        style: TextStyle(color: Colors.red, fontSize: 12),
-                      ),
-                    )
-                    .toList(),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.shade200),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoSection(
+                    '🤖 ML API',
+                    'Topluluk deneylerinden öğrenen makine öğrenmesi modeli. '
+                        'Gerçek kullanıcı verilerine dayalı tahminler.',
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.warning_amber,
-                        size: 16,
-                        color: Colors.orange.shade700,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Diode lazerler max 6-8mm ahşap kesebilir',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.orange.shade700,
+                  const SizedBox(height: 16),
+                  _buildInfoSection(
+                    '🧠 Gemini AI',
+                    'Google\'ın yapay zeka modeli. Geniş bilgi tabanından '
+                        'akıllı öneriler sunar.',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoSection(
+                    '🔀 Karşılaştırma',
+                    'Her iki kaynaktan da tahmin alıp karşılaştırabilirsiniz. '
+                        'En uygun parametreleri seçin.',
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '✅ Desteklenen Malzemeler:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  ...AppConfig.SUPPORTED_MATERIALS
+                      .map((m) => Text('  • $m'))
+                      .toList(),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '❌ Desteklenmeyen:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red,
+                    ),
+                  ),
+                  ...AppConfig.UNSUPPORTED_MATERIALS
+                      .map(
+                        (m) => Text(
+                          '  • $m (CO2 gerektirir)',
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                      )
+                      .toList(),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -606,9 +662,21 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     );
   }
 
-  // ... (Diğer widget metodları aynı kalacak, sadece ekranın geri kalanı)
-  // _buildSectionCard, _buildDropdownField, _buildChipSelector, vs.
+  Widget _buildInfoSection(String title, String description) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+        ),
+        const SizedBox(height: 4),
+        Text(description, style: const TextStyle(fontSize: 13, height: 1.4)),
+      ],
+    );
+  }
 
+  // Section Card
   Widget _buildSectionCard({
     required String title,
     required bool isDark,
@@ -639,6 +707,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     );
   }
 
+  // Dropdown Field
   Widget _buildDropdownField({
     required String label,
     required TextEditingController controller,
@@ -678,6 +747,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     );
   }
 
+  // Chip Selector
   Widget _buildChipSelector({
     required String label,
     required TextEditingController controller,
@@ -731,6 +801,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     );
   }
 
+  // Process Checkbox
   Widget _buildProcessCheckbox(String title, String key, IconData icon) {
     return CheckboxListTile(
       title: Row(
@@ -748,43 +819,82 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     );
   }
 
-  Widget _buildPredictionResults(bool isDark, bool isLarge) {
-    final result = _predictionResult!;
+  // 📊 SONUÇLAR
+  Widget _buildPredictionResults(bool isDark, bool isLargeScreen) {
+    if (_selectedPredictionSource == 'both') {
+      // Karşılaştırmalı görünüm
+      return Column(
+        children: [
+          if (_mlPrediction != null)
+            _buildSinglePredictionCard(
+              _mlPrediction!,
+              '🤖 ML API Tahmini',
+              Colors.green,
+              isDark,
+              isLargeScreen,
+            ),
+          const SizedBox(height: 16),
+          if (_geminiPrediction != null)
+            _buildSinglePredictionCard(
+              _geminiPrediction!,
+              '🧠 Gemini AI Tahmini',
+              Colors.purple,
+              isDark,
+              isLargeScreen,
+            ),
+        ],
+      );
+    } else if (_selectedPredictionSource == 'ml' && _mlPrediction != null) {
+      return _buildSinglePredictionCard(
+        _mlPrediction!,
+        '🤖 ML API Tahmini',
+        Colors.green,
+        isDark,
+        isLargeScreen,
+      );
+    } else if (_selectedPredictionSource == 'gemini' &&
+        _geminiPrediction != null) {
+      return _buildSinglePredictionCard(
+        _geminiPrediction!,
+        '🧠 Gemini AI Tahmini',
+        Colors.purple,
+        isDark,
+        isLargeScreen,
+      );
+    }
 
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildSinglePredictionCard(
+    PredictionResponse result,
+    String title,
+    Color accentColor,
+    bool isDark,
+    bool isLarge,
+  ) {
     return Card(
       elevation: 4,
       color: isDark ? Colors.grey.shade900 : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color:
-              result.dataSource == 'user_data'
-                  ? Colors.green.shade300
-                  : result.dataSource == 'hybrid'
-                  ? Colors.orange.shade300
-                  : Colors.grey.shade300,
-          width: 2,
-        ),
+        side: BorderSide(color: accentColor.withOpacity(0.5), width: 2),
       ),
       child: Padding(
         padding: EdgeInsets.all(isLarge ? 24 : 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ✨ YENİ: Başlık ve Veri Kaynağı Badge
+            // Başlık
             Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: result.getDataSourceColor().withOpacity(0.1),
+                    color: accentColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    Icons.check_circle,
-                    color: result.getDataSourceColor(),
-                    size: 32,
-                  ),
+                  child: Icon(Icons.check_circle, color: accentColor, size: 32),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -792,7 +902,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Tahmin Sonuçları',
+                        title,
                         style: TextStyle(
                           fontSize: isLarge ? 20 : 18,
                           fontWeight: FontWeight.bold,
@@ -800,27 +910,17 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            result.getDataSourceIcon(),
-                            size: 16,
-                            color: result.getDataSourceColor(),
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              result.getDataSourceDescription(),
-                              style: TextStyle(
-                                fontSize: 12,
-                                color:
-                                    isDark
-                                        ? Colors.grey.shade400
-                                        : Colors.grey.shade600,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        result.dataSource == 'gemini_ai'
+                            ? 'Yapay Zeka Önerisi'
+                            : 'Topluluk Verisi',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color:
+                              isDark
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
+                        ),
                       ),
                     ],
                   ),
@@ -829,65 +929,35 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
             ),
             const SizedBox(height: 20),
 
-            // ✨ YENİ: Veri Kaynağı Bilgi Kartı
-            _buildDataSourceCard(result, isDark, isLarge),
+            // Güven Skoru
+            _buildConfidenceScore(result, accentColor, isDark, isLarge),
             const SizedBox(height: 20),
 
-            // Güven skoru (mevcut)
-            _buildConfidenceScore(isDark, isLarge),
-            const SizedBox(height: 20),
-
-            // İşlem parametreleri (mevcut)
+            // Parametreler
             ...result.predictions.entries.map((entry) {
-              return _buildProcessResult(entry, isDark, isLarge);
+              return _buildProcessResult(entry, accentColor, isDark, isLarge);
             }).toList(),
 
-            // Notlar (güncellenmiş)
+            // Notlar
             if (result.notes.isNotEmpty) ...[
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color:
-                      result.dataSource == 'user_data'
-                          ? Colors.green.shade50
-                          : result.dataSource == 'hybrid'
-                          ? Colors.orange.shade50
-                          : Colors.grey.shade50,
+                  color: accentColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color:
-                        result.dataSource == 'user_data'
-                            ? Colors.green.shade200
-                            : result.dataSource == 'hybrid'
-                            ? Colors.orange.shade200
-                            : Colors.grey.shade200,
-                  ),
+                  border: Border.all(color: accentColor.withOpacity(0.3)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.info_outline,
-                      color:
-                          result.dataSource == 'user_data'
-                              ? Colors.green
-                              : result.dataSource == 'hybrid'
-                              ? Colors.orange
-                              : Colors.grey,
-                      size: 20,
-                    ),
+                    Icon(Icons.info_outline, color: accentColor, size: 20),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         result.notes,
                         style: TextStyle(
-                          color:
-                              result.dataSource == 'user_data'
-                                  ? Colors.green.shade900
-                                  : result.dataSource == 'hybrid'
-                                  ? Colors.orange.shade900
-                                  : Colors.grey.shade900,
+                          color: isDark ? Colors.white : Colors.black87,
                           fontSize: 13,
                         ),
                       ),
@@ -902,153 +972,27 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     );
   }
 
-  // ✨ YENİ: Veri Kaynağı Bilgi Kartı
-  Widget _buildDataSourceCard(
+  Widget _buildConfidenceScore(
     PredictionResponse result,
+    Color accentColor,
     bool isDark,
     bool isLarge,
   ) {
-    Color cardColor;
-    IconData icon;
-    String title;
-    String description;
-
-    switch (result.dataSource) {
-      case 'user_data':
-        cardColor = Colors.green;
-        icon = Icons.groups;
-        title = '🎯 Topluluk Verisi Kullanıldı';
-        description =
-            '${result.dataPointsUsed} benzer deney verisinden öğrenildi. '
-            'Bu tahmin gerçek kullanıcı deneyimlerine dayanıyor!';
-        break;
-      case 'hybrid':
-        cardColor = Colors.orange;
-        icon = Icons.merge_type;
-        title = '🔀 Karma Tahmin';
-        description =
-            'Bazı işlemler için topluluk verisi (${result.dataPointsUsed} deney), '
-            'diğerleri için temel algoritma kullanıldı.';
-        break;
-      case 'static_algorithm':
-      default:
-        cardColor = Colors.grey;
-        icon = Icons.calculate;
-        title = '⚙️ Temel Algoritma';
-        description =
-            'Henüz yeterli topluluk verisi yok. '
-            'Siz de veri ekleyerek tahminlerin gelişmesine katkıda bulunabilirsiniz!';
-    }
-
-    return Container(
-      padding: EdgeInsets.all(isLarge ? 16 : 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [cardColor.withOpacity(0.1), cardColor.withOpacity(0.05)],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: cardColor.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: cardColor, size: isLarge ? 24 : 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: isLarge ? 16 : 14,
-                    fontWeight: FontWeight.bold,
-                    color: cardColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            description,
-            style: TextStyle(
-              fontSize: isLarge ? 13 : 12,
-              color: isDark ? Colors.grey.shade300 : Colors.grey.shade700,
-              height: 1.4,
-            ),
-          ),
-          if (result.dataPointsUsed > 0) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _buildStatChip(
-                  Icons.science,
-                  '${result.dataPointsUsed} Deney',
-                  Colors.blue,
-                ),
-                if (result.confidenceScore >= 0.8)
-                  _buildStatChip(Icons.verified, 'Yüksek Güven', Colors.green),
-                if (result.notes.contains('gold standard'))
-                  _buildStatChip(Icons.star, 'Gold Standard', Colors.orange),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // ✨ YENİ: Küçük İstatistik Chip'i
-  Widget _buildStatChip(IconData icon, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildConfidenceScore(bool isDark, bool isLarge) {
-    final confidence = _predictionResult!.confidenceScore;
+    final confidence = result.confidenceScore;
     final percentage = (confidence * 100).toInt();
 
-    Color getColor() {
-      if (confidence >= 0.8) return Colors.green;
-      if (confidence >= 0.6) return Colors.orange;
-      return Colors.red;
-    }
-
     return Container(
       padding: EdgeInsets.all(isLarge ? 16 : 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [getColor().withOpacity(0.1), getColor().withOpacity(0.05)],
+          colors: [accentColor.withOpacity(0.1), accentColor.withOpacity(0.05)],
         ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: getColor().withOpacity(0.3)),
+        border: Border.all(color: accentColor.withOpacity(0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.analytics, color: getColor(), size: isLarge ? 28 : 24),
+          Icon(Icons.analytics, color: accentColor, size: isLarge ? 28 : 24),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -1067,7 +1011,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                   style: TextStyle(
                     fontSize: isLarge ? 24 : 20,
                     fontWeight: FontWeight.bold,
-                    color: getColor(),
+                    color: accentColor,
                   ),
                 ),
               ],
@@ -1083,7 +1027,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                   value: confidence,
                   strokeWidth: 6,
                   backgroundColor: Colors.grey.shade300,
-                  valueColor: AlwaysStoppedAnimation<Color>(getColor()),
+                  valueColor: AlwaysStoppedAnimation<Color>(accentColor),
                 ),
                 Text(
                   percentage >= 80
@@ -1093,7 +1037,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                       : '?',
                   style: TextStyle(
                     fontSize: isLarge ? 28 : 24,
-                    color: getColor(),
+                    color: accentColor,
                   ),
                 ),
               ],
@@ -1106,6 +1050,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
   Widget _buildProcessResult(
     MapEntry<String, ProcessParams> entry,
+    Color accentColor,
     bool isDark,
     bool isLarge,
   ) {
@@ -1128,18 +1073,16 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
       margin: EdgeInsets.only(bottom: isLarge ? 16 : 12),
       padding: EdgeInsets.all(isLarge ? 16 : 12),
       decoration: BoxDecoration(
-        color: isDark ? Colors.grey.shade800 : Colors.green.shade50,
+        color: accentColor.withOpacity(0.05),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? Colors.grey.shade700 : Colors.green.shade200,
-        ),
+        border: Border.all(color: accentColor.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: Colors.green, size: isLarge ? 24 : 20),
+              Icon(icon, color: accentColor, size: isLarge ? 24 : 20),
               const SizedBox(width: 8),
               Text(
                 processName,
@@ -1158,14 +1101,14 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               _buildParamChip(
                 'Güç',
                 '${params.power.toStringAsFixed(1)}%',
-                isDark,
+                accentColor,
               ),
               _buildParamChip(
                 'Hız',
                 '${params.speed.toStringAsFixed(0)} mm/s',
-                isDark,
+                accentColor,
               ),
-              _buildParamChip('Geçiş', '${params.passes}', isDark),
+              _buildParamChip('Geçiş', '${params.passes}', accentColor),
             ],
           ),
         ],
@@ -1173,25 +1116,22 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     );
   }
 
-  Widget _buildParamChip(String label, String value, bool isDark) {
+  Widget _buildParamChip(String label, String value, Color color) {
     return Column(
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
         ),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.green,
+            color: color,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: Colors.green.withOpacity(0.3),
+                color: color.withOpacity(0.3),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),

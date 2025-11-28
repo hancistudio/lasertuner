@@ -48,6 +48,7 @@ dependencies:
   image: ^4.5.4
   file_picker: ^10.3.6
   firebase_remote_config: ^6.1.1
+  google_generative_ai: ^0.4.7
 
 dev_dependencies:
   flutter_test:
