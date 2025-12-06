@@ -7,14 +7,16 @@ class GeminiAIService {
   // 🔑 Google AI Studio'dan alacağınız API Key
   // https://makersuite.google.com/app/apikey
   static const String GEMINI_API_KEY =
-      'AIzaSyC18zBV8TLXZThM7UYFRJ3egZU2kpZbZ50';
+      'AIzaSyDq2c-QZO6j2v4KbQW1YI1IAQzgu4BO1A0';
 
   late final GenerativeModel _model;
 
   GeminiAIService() {
-    // ✅ API versiyonunu belirtmeden model oluştur
+    // ✅ Güncel model adını kullan - Gemini 2.0 Flash
+    // NOT: gemini-1.5-flash artık kullanımdan kaldırıldı
     _model = GenerativeModel(
-      model: 'gemini-pro', // v1beta için hala destekleniyor
+      model: 'gemini-2.0-flash-exp', // Experimental - en yeni özellikler
+      // model: 'gemini-1.5-pro', // Alternatif: Daha güçlü ama yavaş
       apiKey: GEMINI_API_KEY,
       generationConfig: GenerationConfig(
         temperature: 0.7,
@@ -24,7 +26,7 @@ class GeminiAIService {
       ),
     );
 
-    print('✅ Gemini model initialized: gemini-pro');
+    print('✅ Gemini model initialized: gemini-2.0-flash-exp');
   }
 
   /// Gemini ile tahmin al
@@ -106,7 +108,7 @@ Yanıtın sadece JSON olsun!
   /// Gemini yanıtını parse et
   Map<String, dynamic> _parseGeminiResponse(String responseText) {
     try {
-      print('📝 Parsing response...');
+      print('🔍 Parsing response...');
 
       // Markdown kod bloklarını temizle
       String cleanedText =

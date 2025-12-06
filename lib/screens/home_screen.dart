@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:lasertuner/data_list_screen.dart';
+import 'package:lasertuner/screens/data_list_screen.dart';
 import '../services/auth_service.dart';
 import '../models/user_model.dart';
 import 'add_data_screen.dart';

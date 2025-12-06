@@ -2,6 +2,7 @@
 """
 LaserTuner ML API v3.0 - DIODE LASER EDITION
 Backend API for Diode Laser Machines (2W-40W)
+AppConfig Compatible - Updated Material System
 """
 from online_learning_service import get_online_learner 
 from fastapi import FastAPI, HTTPException, Request
@@ -79,24 +80,57 @@ class PredictionRequest(BaseModel):
     
     @validator('materialType')
     def validate_material(cls, v):
-        # Diode lazer için uygun malzemeler
+        """✅ AppConfig uyumlu malzeme validasyonu - esnek yaklaşım"""
+        # Desteklenen tüm malzemeler (AppConfig'den)
         valid_materials = {
+            # Ahşap Ürünleri
             'ahşap', 'ahsap', 'wood',
+            'kontrplak', 'plywood',
             'mdf',
-            'karton', 'cardboard',
+            'balsa',
+            'bambu', 'bamboo',
+            'kayın', 'kayin', 'beech',
+            'meşe', 'mese', 'oak',
+            'ceviz', 'walnut',
+            'akçaağaç', 'akcaagac', 'maple',
+            'huş', 'hus', 'birch',
+            'çam', 'cam', 'pine',
+            
+            # Organik Malzemeler
             'deri', 'leather',
-            'keçe', 'felt',
-            'kumaş', 'fabric', 'kumas',
+            'karton', 'cardboard',
             'kağıt', 'kagit', 'paper',
+            'kumaş', 'kumas', 'fabric',
+            'keçe', 'kece', 'felt',
+            'mantar', 'cork',
+            
+            # Sentetik Malzemeler
+            'akrilik', 'acrylic',
+            'lastik', 'rubber',
             'köpük', 'kopuk', 'foam',
-            'mantar', 'cork'
+            
+            # Metal (Sınırlı - sadece markalama)
+            'anodize_aluminyum', 'anodized_aluminum',
+            
+            # Diğer
+            'diger', 'other'
         }
         
-        if v.lower() not in valid_materials:
-            raise ValueError(
-                f"Diode lazer için desteklenmeyen malzeme: {v}. "
-                f"Desteklenen malzemeler: Ahşap, MDF, Karton, Deri, Keçe, Kumaş, Kağıt, Köpük, Mantar"
-            )
+        # Normalize
+        v_lower = v.lower().strip()
+        
+        # Exact match
+        if v_lower in valid_materials:
+            return v
+        
+        # Partial match (esnek kontrol - kullanıcı "Ahşap (Wood)" gibi gönderebilir)
+        for valid in valid_materials:
+            if valid in v_lower or v_lower in valid:
+                logger.info(f"✅ Material matched: '{v}' → '{valid}'")
+                return v
+        
+        # Uyarı ver ama reddetme (Firebase'de farklı yazılmış olabilir)
+        logger.warning(f"⚠️ Unknown material: {v}, but allowing for flexibility")
         return v
 
 
@@ -122,59 +156,109 @@ class HealthResponse(BaseModel):
     total_experiments: int = 0
 
 
-# ============= DIODE LASER PARAMETERS =============
+# ============= DIODE LASER PARAMETERS - AppConfig Compatible =============
 
 def get_diode_material_params(material: str) -> Dict:
-    """Get base parameters for diode laser materials"""
-    material = material.lower()
+    """
+    ✅ AppConfig uyumlu malzeme parametreleri
+    Get base parameters for diode laser materials
+    """
+    material = material.lower().strip()
     
     # Format: {base_power_%, power_per_mm, base_speed, speed_per_mm, base_passes, passes_per_mm}
     params = {
-        # Ahşap - en yaygın kullanım
+        # ===== AHŞAP ÜRÜNLERİ =====
         'ahşap': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
         'ahsap': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
         'wood': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
         
-        # MDF - ahşaba benzer
+        'kontrplak': {'base_power': 82, 'power_mult': 4.2, 'base_speed': 290, 'speed_mult': 32, 'base_passes': 2, 'passes_mult': 0.5},
+        'plywood': {'base_power': 82, 'power_mult': 4.2, 'base_speed': 290, 'speed_mult': 32, 'base_passes': 2, 'passes_mult': 0.5},
+        
         'mdf': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
         
-        # Karton - kolay kesilir
+        'balsa': {'base_power': 60, 'power_mult': 2.5, 'base_speed': 380, 'speed_mult': 20, 'base_passes': 1, 'passes_mult': 0.3},
+        
+        'bambu': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
+        'bamboo': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
+        
+        'kayın': {'base_power': 88, 'power_mult': 5.0, 'base_speed': 260, 'speed_mult': 38, 'base_passes': 3, 'passes_mult': 0.7},
+        'kayin': {'base_power': 88, 'power_mult': 5.0, 'base_speed': 260, 'speed_mult': 38, 'base_passes': 3, 'passes_mult': 0.7},
+        'beech': {'base_power': 88, 'power_mult': 5.0, 'base_speed': 260, 'speed_mult': 38, 'base_passes': 3, 'passes_mult': 0.7},
+        
+        'meşe': {'base_power': 90, 'power_mult': 5.5, 'base_speed': 250, 'speed_mult': 40, 'base_passes': 3, 'passes_mult': 0.8},
+        'mese': {'base_power': 90, 'power_mult': 5.5, 'base_speed': 250, 'speed_mult': 40, 'base_passes': 3, 'passes_mult': 0.8},
+        'oak': {'base_power': 90, 'power_mult': 5.5, 'base_speed': 250, 'speed_mult': 40, 'base_passes': 3, 'passes_mult': 0.8},
+        
+        'ceviz': {'base_power': 87, 'power_mult': 5.0, 'base_speed': 270, 'speed_mult': 38, 'base_passes': 3, 'passes_mult': 0.7},
+        'walnut': {'base_power': 87, 'power_mult': 5.0, 'base_speed': 270, 'speed_mult': 38, 'base_passes': 3, 'passes_mult': 0.7},
+        
+        'akçaağaç': {'base_power': 88, 'power_mult': 5.2, 'base_speed': 265, 'speed_mult': 39, 'base_passes': 3, 'passes_mult': 0.7},
+        'akcaagac': {'base_power': 88, 'power_mult': 5.2, 'base_speed': 265, 'speed_mult': 39, 'base_passes': 3, 'passes_mult': 0.7},
+        'maple': {'base_power': 88, 'power_mult': 5.2, 'base_speed': 265, 'speed_mult': 39, 'base_passes': 3, 'passes_mult': 0.7},
+        
+        'huş': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
+        'hus': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
+        'birch': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
+        
+        'çam': {'base_power': 78, 'power_mult': 3.8, 'base_speed': 310, 'speed_mult': 28, 'base_passes': 2, 'passes_mult': 0.5},
+        'cam': {'base_power': 78, 'power_mult': 3.8, 'base_speed': 310, 'speed_mult': 28, 'base_passes': 2, 'passes_mult': 0.5},
+        'pine': {'base_power': 78, 'power_mult': 3.8, 'base_speed': 310, 'speed_mult': 28, 'base_passes': 2, 'passes_mult': 0.5},
+        
+        # ===== ORGANİK MALZEMELER =====
         'karton': {'base_power': 50, 'power_mult': 3.0, 'base_speed': 400, 'speed_mult': 25, 'base_passes': 1, 'passes_mult': 0.3},
         'cardboard': {'base_power': 50, 'power_mult': 3.0, 'base_speed': 400, 'speed_mult': 25, 'base_passes': 1, 'passes_mult': 0.3},
         
-        # Deri - orta zorluk
         'deri': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 350, 'speed_mult': 28, 'base_passes': 1, 'passes_mult': 0.4},
         'leather': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 350, 'speed_mult': 28, 'base_passes': 1, 'passes_mult': 0.4},
         
-        # Keçe - kolay
         'keçe': {'base_power': 60, 'power_mult': 2.5, 'base_speed': 380, 'speed_mult': 20, 'base_passes': 1, 'passes_mult': 0.2},
+        'kece': {'base_power': 60, 'power_mult': 2.5, 'base_speed': 380, 'speed_mult': 20, 'base_passes': 1, 'passes_mult': 0.2},
         'felt': {'base_power': 60, 'power_mult': 2.5, 'base_speed': 380, 'speed_mult': 20, 'base_passes': 1, 'passes_mult': 0.2},
         
-        # Kumaş - çok kolay
         'kumaş': {'base_power': 45, 'power_mult': 2.0, 'base_speed': 420, 'speed_mult': 15, 'base_passes': 1, 'passes_mult': 0.1},
         'kumas': {'base_power': 45, 'power_mult': 2.0, 'base_speed': 420, 'speed_mult': 15, 'base_passes': 1, 'passes_mult': 0.1},
         'fabric': {'base_power': 45, 'power_mult': 2.0, 'base_speed': 420, 'speed_mult': 15, 'base_passes': 1, 'passes_mult': 0.1},
         
-        # Kağıt - çok kolay
         'kağıt': {'base_power': 40, 'power_mult': 1.5, 'base_speed': 450, 'speed_mult': 10, 'base_passes': 1, 'passes_mult': 0.1},
         'kagit': {'base_power': 40, 'power_mult': 1.5, 'base_speed': 450, 'speed_mult': 10, 'base_passes': 1, 'passes_mult': 0.1},
         'paper': {'base_power': 40, 'power_mult': 1.5, 'base_speed': 450, 'speed_mult': 10, 'base_passes': 1, 'passes_mult': 0.1},
         
-        # Köpük - kolay
         'köpük': {'base_power': 55, 'power_mult': 2.0, 'base_speed': 400, 'speed_mult': 18, 'base_passes': 1, 'passes_mult': 0.2},
         'kopuk': {'base_power': 55, 'power_mult': 2.0, 'base_speed': 400, 'speed_mult': 18, 'base_passes': 1, 'passes_mult': 0.2},
         'foam': {'base_power': 55, 'power_mult': 2.0, 'base_speed': 400, 'speed_mult': 18, 'base_passes': 1, 'passes_mult': 0.2},
         
-        # Mantar - orta
         'mantar': {'base_power': 65, 'power_mult': 3.0, 'base_speed': 360, 'speed_mult': 22, 'base_passes': 1, 'passes_mult': 0.3},
         'cork': {'base_power': 65, 'power_mult': 3.0, 'base_speed': 360, 'speed_mult': 22, 'base_passes': 1, 'passes_mult': 0.3},
+        
+        # ===== SENTETİK MALZEMELER =====
+        'akrilik': {'base_power': 75, 'power_mult': 4.0, 'base_speed': 280, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
+        'acrylic': {'base_power': 75, 'power_mult': 4.0, 'base_speed': 280, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
+        
+        'lastik': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 320, 'speed_mult': 25, 'base_passes': 1, 'passes_mult': 0.4},
+        'rubber': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 320, 'speed_mult': 25, 'base_passes': 1, 'passes_mult': 0.4},
+        
+        # ===== METAL (Sınırlı) =====
+        'anodize_aluminyum': {'base_power': 95, 'power_mult': 8.0, 'base_speed': 150, 'speed_mult': 50, 'base_passes': 5, 'passes_mult': 1.5},
+        'anodized_aluminum': {'base_power': 95, 'power_mult': 8.0, 'base_speed': 150, 'speed_mult': 50, 'base_passes': 5, 'passes_mult': 1.5},
     }
     
-    # Default values
-    return params.get(material, {
+    # Try exact match first
+    if material in params:
+        return params[material]
+    
+    # Try partial match (esnek - "Ahşap (Wood)" → "ahsap")
+    for key in params.keys():
+        if key in material or material in key:
+            logger.info(f"✅ Material param matched: '{material}' → '{key}'")
+            return params[key]
+    
+    # Default values (bilinmeyen malzemeler için)
+    logger.warning(f"⚠️ Using default params for material: {material}")
+    return {
         'base_power': 75, 'power_mult': 3.5, 'base_speed': 320, 
         'speed_mult': 25, 'base_passes': 2, 'passes_mult': 0.4
-    })
+    }
 
 
 def calculate_diode_cutting_params(material: str, thickness: float) -> ProcessParams:
@@ -441,9 +525,8 @@ async def test_endpoint():
         "total_experiments": stats.get('total_experiments', 0),
         "verified_experiments": stats.get('verified_experiments', 0),
         "supported_materials": [
-            "Ahşap (Wood)", "MDF", "Karton (Cardboard)", "Deri (Leather)",
-            "Keçe (Felt)", "Kumaş (Fabric)", "Kağıt (Paper)", 
-            "Köpük (Foam)", "Mantar (Cork)"
+            "Ahşap Ürünleri (11 çeşit)", "Organik Malzemeler (6 çeşit)", 
+            "Sentetik Malzemeler (3 çeşit)", "Metal (Sınırlı - sadece markalama)"
         ],
         "example_request": {
             "machineBrand": "xTool D1 Pro",
@@ -457,33 +540,59 @@ async def test_endpoint():
 
 @app.get("/materials")
 async def get_supported_materials():
-    """Get list of supported materials for diode laser"""
+    """✅ AppConfig uyumlu malzeme listesi - kategorik yapı"""
     return {
         "supported_materials": {
-            "organic": [
-                {"name": "Ahşap (Wood)", "turkish": "Ahşap", "english": "Wood", "max_thickness": 8},
-                {"name": "MDF", "turkish": "MDF", "english": "MDF", "max_thickness": 6},
-                {"name": "Karton (Cardboard)", "turkish": "Karton", "english": "Cardboard", "max_thickness": 5},
-                {"name": "Deri (Leather)", "turkish": "Deri", "english": "Leather", "max_thickness": 5},
-                {"name": "Keçe (Felt)", "turkish": "Keçe", "english": "Felt", "max_thickness": 4},
-                {"name": "Kumaş (Fabric)", "turkish": "Kumaş", "english": "Fabric", "max_thickness": 3},
-                {"name": "Kağıt (Paper)", "turkish": "Kağıt", "english": "Paper", "max_thickness": 2},
-                {"name": "Köpük (Foam)", "turkish": "Köpük", "english": "Foam", "max_thickness": 10},
-                {"name": "Mantar (Cork)", "turkish": "Mantar", "english": "Cork", "max_thickness": 6}
+            "ahsap_urunleri": [
+                {"name": "Ahşap", "key": "ahsap", "max_thickness": 8, "difficulty": "Orta"},
+                {"name": "Kontrplak", "key": "kontrplak", "max_thickness": 10, "difficulty": "Orta"},
+                {"name": "MDF", "key": "mdf", "max_thickness": 8, "difficulty": "Orta"},
+                {"name": "Balsa Ağacı", "key": "balsa", "max_thickness": 10, "difficulty": "Kolay"},
+                {"name": "Bambu", "key": "bambu", "max_thickness": 8, "difficulty": "Orta"},
+                {"name": "Kayın", "key": "kayin", "max_thickness": 6, "difficulty": "Zor"},
+                {"name": "Meşe", "key": "mese", "max_thickness": 5, "difficulty": "Zor"},
+                {"name": "Ceviz", "key": "ceviz", "max_thickness": 5, "difficulty": "Zor"},
+                {"name": "Akçaağaç", "key": "akcaagac", "max_thickness": 5, "difficulty": "Zor"},
+                {"name": "Huş Ağacı", "key": "hus", "max_thickness": 6, "difficulty": "Orta"},
+                {"name": "Çam", "key": "cam", "max_thickness": 6, "difficulty": "Orta"}
+            ],
+            "organik_malzemeler": [
+                {"name": "Deri", "key": "deri", "max_thickness": 5, "difficulty": "Kolay"},
+                {"name": "Karton", "key": "karton", "max_thickness": 5, "difficulty": "Çok Kolay"},
+                {"name": "Kağıt", "key": "kagit", "max_thickness": 2, "difficulty": "Çok Kolay"},
+                {"name": "Kumaş", "key": "kumas", "max_thickness": 3, "difficulty": "Çok Kolay"},
+                {"name": "Keçe", "key": "kece", "max_thickness": 4, "difficulty": "Çok Kolay"},
+                {"name": "Mantar", "key": "mantar", "max_thickness": 6, "difficulty": "Kolay"}
+            ],
+            "sentetik_malzemeler": [
+                {"name": "Akrilik", "key": "akrilik", "max_thickness": 3, "difficulty": "Orta", 
+                 "warning": "Sadece bazı diode lazerler destekler"},
+                {"name": "Lastik", "key": "lastik", "max_thickness": 5, "difficulty": "Orta"},
+                {"name": "Köpük", "key": "kopuk", "max_thickness": 10, "difficulty": "Çok Kolay"}
+            ],
+            "metal_sinirli": [
+                {"name": "Anodize Alüminyum", "key": "anodize_aluminyum", "max_thickness": 1, 
+                 "difficulty": "Çok Zor", "warning": "Sadece markalama için, kesim değil"}
             ]
         },
         "not_supported": [
-            "Akrilik/Plexiglass (CO2 lazer gerektirir)",
             "Metal (Fiber lazer gerektirir)",
             "Cam (Fiber lazer gerektirir)",
-            "Seramik"
+            "Seramik",
+            "Taş"
         ],
         "notes": [
             "Diode lazerler 2W-40W güç aralığında çalışır",
             "En iyi sonuçlar 3-5mm kalınlıkta alınır",
             "8mm üzeri kesim çok zordur ve önerilmez",
             "Organik malzemeler (ahşap, deri, kağıt) en iyi sonuçları verir"
-        ]
+        ],
+        "categories_info": {
+            "ahsap_urunleri": "11 çeşit ahşap malzeme - en yaygın kullanım",
+            "organik_malzemeler": "6 çeşit doğal organik malzeme",
+            "sentetik_malzemeler": "3 çeşit sentetik malzeme (bazı kısıtlamalar)",
+            "metal_sinirli": "Sadece markalama için (kesim yapılamaz)"
+        }
     }
 
 
@@ -495,6 +604,7 @@ async def startup_event():
     logger.info("="*50)
     logger.info("🚀 LaserTuner ML API v3.0 - DIODE LASER EDITION")
     logger.info("⚡ Power Range: 2W - 40W")
+    logger.info("✅ AppConfig Compatible Material System")
     logger.info(f"Allowed Origins: {ALLOWED_ORIGINS}")
     
     # Initialize Firebase
@@ -505,7 +615,7 @@ async def startup_event():
         logger.info(f"📊 Total experiments: {stats.get('total_experiments', 0)}")
         logger.info(f"✅ Verified experiments: {stats.get('verified_experiments', 0)}")
         
-        # ✨ YENİ: Online learning başlat
+        # ✨ YENI: Online learning başlat
         try:
             learner = get_online_learner()
             if learner.should_update():

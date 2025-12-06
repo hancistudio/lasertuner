@@ -1,5 +1,8 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lasertuner/config/app_config.dart';
 import 'package:lasertuner/screens/user_profile_screen.dart';
 import '../models/experiment_model.dart';
 import '../services/firestore_service.dart';
@@ -309,6 +312,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                     const SizedBox(width: 12),
 
                     // Başlık bilgileri
+                    // Başlık bilgileri
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,7 +327,8 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${widget.experiment.materialType} - ${widget.experiment.materialThickness}mm',
+                            // ⬇️ BURADA DEĞİŞTİR
+                            '${AppConfig.getMaterialDisplayName(widget.experiment.materialType)} - ${widget.experiment.materialThickness}mm',
                             style: TextStyle(
                               color:
                                   isDark

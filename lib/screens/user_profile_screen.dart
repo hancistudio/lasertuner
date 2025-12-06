@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lasertuner/config/app_config.dart';
 import '../models/experiment_model.dart';
 import '../models/user_model.dart';
 
@@ -517,7 +518,8 @@ class _DetailedExperimentCardState extends State<_DetailedExperimentCard> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${exp.materialType} - ${exp.materialThickness}mm',
+                        // ⬇️ BURADA DEĞİŞTİR
+                        '${AppConfig.getMaterialDisplayName(exp.materialType)} - ${exp.materialThickness}mm',
                         style: TextStyle(
                           color:
                               widget.isDark

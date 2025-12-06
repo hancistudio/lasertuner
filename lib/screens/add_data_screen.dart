@@ -6,7 +6,6 @@ import 'dart:typed_data';
 import '../models/experiment_model.dart';
 import '../services/firestore_service.dart';
 import '../widgets/custom_button.dart';
-import '../widgets/custom_textfield.dart';
 
 class AddDataScreen extends StatefulWidget {
   final String userId;
@@ -21,16 +20,15 @@ class _AddDataScreenState extends State<AddDataScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   final ImagePicker _imagePicker = ImagePicker();
 
-  final TextEditingController _machineBrandController = TextEditingController();
-  final TextEditingController _laserPowerController = TextEditingController();
-  final TextEditingController _materialTypeController = TextEditingController();
-  final TextEditingController _thicknessController = TextEditingController();
+  // Seçili değerler
+  String? _selectedMachine;
+  double? _selectedPower;
+  String? _selectedMaterial;
+  double? _selectedThickness;
 
-  // İlk fotoğraf
+  // Fotoğraflar
   XFile? _selectedImageFile;
   Uint8List? _webImage;
-
-  // İkinci fotoğraf
   XFile? _selectedImageFile2;
   Uint8List? _webImage2;
 
@@ -96,70 +94,53 @@ class _AddDataScreenState extends State<AddDataScreen> {
   }
 
   bool _validateInputs() {
-    // Material validation
-    final material = _materialTypeController.text;
-    for (String unsupported in AppConfig.UNSUPPORTED_MATERIALS) {
-      if (material.toLowerCase().contains(unsupported.toLowerCase())) {
-        _showSnackBar(
-          '❌ $material diode lazer için uygun değil! '
-          'Lütfen ${AppConfig.SUPPORTED_MATERIALS.join(", ")} gibi malzemeler kullanın.',
-        );
-        return false;
+    if (_selectedMachine == null) {
+      _showSnackBar('⚠️ Lütfen makine seçin');
+      return false;
+    }
+    if (_selectedPower == null) {
+      _showSnackBar('⚠️ Lütfen lazer gücü seçin');
+      return false;
+    }
+    if (_selectedMaterial == null) {
+      _showSnackBar('⚠️ Lütfen malzeme seçin');
+      return false;
+    }
+    if (_selectedThickness == null) {
+      _showSnackBar('⚠️ Lütfen kalınlık seçin');
+      return false;
+    }
+
+    if (!_selectedProcesses.containsValue(true)) {
+      _showSnackBar('⚠️ En az bir işlem tipi seçin');
+      return false;
+    }
+
+    if (_selectedImageFile == null) {
+      _showSnackBar('⚠️ Lütfen en az bir fotoğraf yükleyin');
+      return false;
+    }
+
+    // Process parametreleri kontrolü
+    for (var entry in _selectedProcesses.entries) {
+      if (entry.value) {
+        final controllers = _processControllers[entry.key]!;
+        if (controllers['power']!.text.isEmpty ||
+            controllers['speed']!.text.isEmpty ||
+            controllers['passes']!.text.isEmpty) {
+          _showSnackBar(
+            '⚠️ ${_getProcessName(entry.key)} için tüm parametreleri girin',
+          );
+          return false;
+        }
       }
-    }
-
-    // Power validation
-    final power = double.tryParse(_laserPowerController.text) ?? 0;
-    if (power < AppConfig.MIN_LASER_POWER ||
-        power > AppConfig.MAX_LASER_POWER) {
-      _showSnackBar(
-        '❌ Diode lazer gücü ${AppConfig.MIN_LASER_POWER}W - ${AppConfig.MAX_LASER_POWER}W arasında olmalı!',
-      );
-      return false;
-    }
-
-    // Thickness validation
-    final thickness = double.tryParse(_thicknessController.text) ?? 0;
-    if (thickness > AppConfig.MAX_THICKNESS) {
-      _showSnackBar(
-        '❌ Diode lazerler max ${AppConfig.MAX_THICKNESS}mm kesebilir!',
-      );
-      return false;
-    }
-
-    if (thickness > 6) {
-      // Warning, not error
-      _showSnackBar(
-        '⚠️ ${thickness}mm kalınlık diode lazer için zorlu olabilir. İdeal: 2-5mm',
-      );
     }
 
     return true;
   }
 
   Future<void> _submitData() async {
-    if (_machineBrandController.text.isEmpty ||
-        _laserPowerController.text.isEmpty ||
-        _materialTypeController.text.isEmpty ||
-        _thicknessController.text.isEmpty) {
-      _showSnackBar('Lütfen tüm alanları doldurun');
-      return;
-    }
-
-    // ✨ NEW: Validate for diode laser
-    if (!_validateInputs()) {
-      return;
-    }
-
-    if (!_selectedProcesses.containsValue(true)) {
-      _showSnackBar('En az bir işlem tipi seçin');
-      return;
-    }
-
-    if (_selectedImageFile == null) {
-      _showSnackBar('Lütfen en az bir fotoğraf yükleyin');
-      return;
-    }
+    if (!_validateInputs()) return;
 
     setState(() => _isLoading = true);
 
@@ -182,10 +163,10 @@ class _AddDataScreenState extends State<AddDataScreen> {
       ExperimentModel experiment = ExperimentModel(
         id: '',
         userId: widget.userId,
-        machineBrand: _machineBrandController.text,
-        laserPower: double.parse(_laserPowerController.text),
-        materialType: _materialTypeController.text,
-        materialThickness: double.parse(_thicknessController.text),
+        machineBrand: _selectedMachine!,
+        laserPower: _selectedPower!,
+        materialType: AppConfig.getMaterialDisplayName(_selectedMaterial!),
+        materialThickness: _selectedThickness!,
         processes: processes,
         photoUrl: '',
         photoUrl2: '',
@@ -201,25 +182,40 @@ class _AddDataScreenState extends State<AddDataScreen> {
         imageFile2: _selectedImageFile2,
       );
 
-      _showSnackBar('Veri başarıyla eklendi!');
+      _showSnackBar('✅ Veri başarıyla eklendi!');
 
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      _showSnackBar('Hata: ${e.toString()}');
+      _showSnackBar('❌ Hata: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _showSnackBar(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  String _getProcessName(String key) {
+    switch (key) {
+      case 'cutting':
+        return 'Kesme';
+      case 'engraving':
+        return 'Kazıma';
+      case 'scoring':
+        return 'Çizme';
+      default:
+        return key;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final size = MediaQuery.of(context).size;
+    final isMobile = size.width < 600;
 
     return Scaffold(
       appBar: AppBar(
@@ -235,138 +231,23 @@ class _AddDataScreenState extends State<AddDataScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Makine bilgileri
+                // Bilgilendirme kartı
                 Card(
+                  color: Colors.blue.shade50,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Text(
-                          'Makine Bilgileri',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 16),
-                        CustomTextField(
-                          controller: _machineBrandController,
-                          label: 'Makine Marka/Model',
-                        ),
-                        const SizedBox(height: 16),
-                        CustomTextField(
-                          controller: _laserPowerController,
-                          label: 'Lazer Gücü (W)',
-                          keyboardType: TextInputType.number,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Malzeme bilgileri
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Malzeme Bilgileri',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 16),
-                        CustomTextField(
-                          controller: _materialTypeController,
-                          label: 'Malzeme Türü',
-                        ),
-                        const SizedBox(height: 16),
-                        CustomTextField(
-                          controller: _thicknessController,
-                          label: 'Kalınlık (mm)',
-                          keyboardType: TextInputType.number,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // İşlem tipleri
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'İşlem Tipleri',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 16),
-                        ..._buildProcessSelections(),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Fotoğraflar
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.photo_library, color: Colors.blue),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Fotoğraflar',
-                              style: Theme.of(context).textTheme.titleLarge,
+                        Icon(Icons.info_outline, color: Colors.blue.shade700),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Deneyimlediğiniz başarılı kesim parametrelerini topluluğa ekleyin. Veriler onaylandıktan sonra tahmin sisteminde kullanılacak.',
+                            style: TextStyle(
+                              color: Colors.blue.shade900,
+                              fontSize: 13,
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'En az 1, en fazla 2 fotoğraf ekleyebilirsiniz.',
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 13,
                           ),
-                        ),
-                        const SizedBox(height: 16),
-
-                        // İlk fotoğraf
-                        _buildPhotoSection(
-                          title: '1. Fotoğraf (Zorunlu)',
-                          imageFile: _selectedImageFile,
-                          webImage: _webImage,
-                          onPick: () => _pickImage(isSecond: false),
-                          onRemove:
-                              () => setState(() {
-                                _selectedImageFile = null;
-                                _webImage = null;
-                              }),
-                          isRequired: true,
-                          isDark: isDark,
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // İkinci fotoğraf
-                        _buildPhotoSection(
-                          title: '2. Fotoğraf (İsteğe Bağlı)',
-                          imageFile: _selectedImageFile2,
-                          webImage: _webImage2,
-                          onPick: () => _pickImage(isSecond: true),
-                          onRemove:
-                              () => setState(() {
-                                _selectedImageFile2 = null;
-                                _webImage2 = null;
-                              }),
-                          isRequired: false,
-                          isDark: isDark,
                         ),
                       ],
                     ),
@@ -374,6 +255,23 @@ class _AddDataScreenState extends State<AddDataScreen> {
                 ),
                 const SizedBox(height: 24),
 
+                // Makine seçimi
+                _buildMachineSection(isDark, isMobile),
+                const SizedBox(height: 16),
+
+                // Malzeme seçimi
+                _buildMaterialSection(isDark, isMobile),
+                const SizedBox(height: 16),
+
+                // İşlem tipleri
+                _buildProcessSection(isDark, isMobile),
+                const SizedBox(height: 16),
+
+                // Fotoğraflar
+                _buildPhotoSection(isDark, isMobile),
+                const SizedBox(height: 24),
+
+                // Gönder butonu
                 CustomButton(
                   text: 'Veriyi Gönder',
                   onPressed: _submitData,
@@ -387,7 +285,508 @@ class _AddDataScreenState extends State<AddDataScreen> {
     );
   }
 
-  Widget _buildPhotoSection({
+  Widget _buildMachineSection(bool isDark, bool isMobile) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.precision_manufacturing, color: Colors.green),
+                const SizedBox(width: 8),
+                Text(
+                  'Makine Bilgileri',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Makine seçimi
+            Text(
+              'Makine Modeli',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children:
+                  AppConfig.SUPPORTED_MACHINES.map((machine) {
+                    final machineName = machine['name'] as String;
+                    final isSelected = _selectedMachine == machineName;
+                    return FilterChip(
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(machine['icon'] as String),
+                          const SizedBox(width: 4),
+                          Text(machineName),
+                        ],
+                      ),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedMachine = selected ? machineName : null;
+                          if (selected) {
+                            _selectedPower = machine['defaultPower'] as double;
+                          }
+                        });
+                      },
+                      selectedColor: Colors.green,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black87,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 13,
+                      ),
+                    );
+                  }).toList(),
+            ),
+
+            if (_selectedMachine != null) ...[
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 16),
+
+              // Güç seçimi
+              Text(
+                'Lazer Gücü',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    AppConfig.getPowerRangeForMachine(_selectedMachine!).map((
+                      power,
+                    ) {
+                      final isSelected = _selectedPower == power;
+                      return ChoiceChip(
+                        label: Text('${power.toInt()}W'),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(
+                            () => _selectedPower = selected ? power : null,
+                          );
+                        },
+                        selectedColor: Colors.blue,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black87,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      );
+                    }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMaterialSection(bool isDark, bool isMobile) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.category, color: Colors.orange),
+                const SizedBox(width: 8),
+                Text(
+                  'Malzeme Bilgileri',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Malzeme kategorileri
+            ...AppConfig.MATERIAL_CATEGORIES.entries.map((category) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      category.key,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children:
+                        category.value.map((material) {
+                          final materialKey = material['key'] as String;
+                          final isSelected = _selectedMaterial == materialKey;
+                          return FilterChip(
+                            label: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(material['icon'] as String),
+                                const SizedBox(width: 4),
+                                Text(material['name'] as String),
+                              ],
+                            ),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedMaterial =
+                                    selected ? materialKey : null;
+                                if (selected) {
+                                  final maxThickness =
+                                      AppConfig.getMaxThicknessForMaterial(
+                                        materialKey,
+                                      );
+                                  if (_selectedThickness != null &&
+                                      _selectedThickness! > maxThickness) {
+                                    _selectedThickness = null;
+                                  }
+                                }
+                              });
+                            },
+                            selectedColor: Colors.orange,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black87,
+                              fontWeight:
+                                  isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                              fontSize: 12,
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              );
+            }).toList(),
+
+            if (_selectedMaterial != null) ...[
+              const Divider(),
+              const SizedBox(height: 16),
+
+              // Kalınlık seçimi
+              Row(
+                children: [
+                  Text(
+                    'Kalınlık (mm)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Max: ${AppConfig.getMaxThicknessForMaterial(_selectedMaterial!).toInt()}mm',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.orange.shade900,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    AppConfig.THICKNESS_VALUES
+                        .where(
+                          (t) =>
+                              t <=
+                              AppConfig.getMaxThicknessForMaterial(
+                                _selectedMaterial!,
+                              ),
+                        )
+                        .map((thickness) {
+                          final isSelected = _selectedThickness == thickness;
+                          return ChoiceChip(
+                            label: Text('$thickness mm'),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(
+                                () =>
+                                    _selectedThickness =
+                                        selected ? thickness : null,
+                              );
+                            },
+                            selectedColor: Colors.blue,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black87,
+                              fontWeight:
+                                  isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                            ),
+                          );
+                        })
+                        .toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProcessSection(bool isDark, bool isMobile) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.settings, color: Colors.purple),
+                const SizedBox(width: 8),
+                Text(
+                  'İşlem Parametreleri',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Kullandığınız parametreleri girin',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 16),
+
+            _buildProcessInputs(
+              'cutting',
+              'Kesme',
+              Icons.content_cut,
+              Colors.red,
+            ),
+            const SizedBox(height: 12),
+            _buildProcessInputs('engraving', 'Kazıma', Icons.draw, Colors.blue),
+            const SizedBox(height: 12),
+            _buildProcessInputs(
+              'scoring',
+              'Çizme',
+              Icons.border_style,
+              Colors.orange,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProcessInputs(
+    String key,
+    String name,
+    IconData icon,
+    Color color,
+  ) {
+    final controllers = _processControllers[key]!;
+    final isSelected = _selectedProcesses[key]!;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isSelected ? color : Colors.grey.shade300),
+      ),
+      child: Column(
+        children: [
+          CheckboxListTile(
+            title: Row(
+              children: [
+                Icon(icon, size: 20, color: color),
+                const SizedBox(width: 8),
+                Text(name, style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            value: isSelected,
+            onChanged: (value) {
+              setState(() => _selectedProcesses[key] = value ?? false);
+            },
+            activeColor: color,
+          ),
+          if (isSelected)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controllers['power']!,
+                          decoration: InputDecoration(
+                            labelText: 'Güç (%)',
+                            hintText: '0-100',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: controllers['speed']!,
+                          decoration: InputDecoration(
+                            labelText: 'Hız (mm/s)',
+                            hintText: '50-500',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: controllers['passes']!,
+                          decoration: InputDecoration(
+                            labelText: 'Geçiş',
+                            hintText: '1-20',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Text('Kalite: ${_qualityScores[key]!.toInt()}/10'),
+                      Expanded(
+                        child: Slider(
+                          value: _qualityScores[key]!,
+                          min: 0,
+                          max: 10,
+                          divisions: 10,
+                          label: _qualityScores[key]!.toInt().toString(),
+                          onChanged:
+                              (value) =>
+                                  setState(() => _qualityScores[key] = value),
+                          activeColor: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPhotoSection(bool isDark, bool isMobile) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.photo_library, color: Colors.blue),
+                const SizedBox(width: 8),
+                Text(
+                  'Fotoğraflar',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'En az 1, en fazla 2 fotoğraf ekleyebilirsiniz.',
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+
+            _buildPhotoUpload(
+              title: '1. Fotoğraf (Zorunlu)',
+              imageFile: _selectedImageFile,
+              webImage: _webImage,
+              onPick: () => _pickImage(isSecond: false),
+              onRemove:
+                  () => setState(() {
+                    _selectedImageFile = null;
+                    _webImage = null;
+                  }),
+              isRequired: true,
+              isDark: isDark,
+            ),
+
+            const SizedBox(height: 16),
+
+            _buildPhotoUpload(
+              title: '2. Fotoğraf (İsteğe Bağlı)',
+              imageFile: _selectedImageFile2,
+              webImage: _webImage2,
+              onPick: () => _pickImage(isSecond: true),
+              onRemove:
+                  () => setState(() {
+                    _selectedImageFile2 = null;
+                    _webImage2 = null;
+                  }),
+              isRequired: false,
+              isDark: isDark,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoUpload({
     required String title,
     required XFile? imageFile,
     required Uint8List? webImage,
@@ -494,7 +893,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
               icon: const Icon(Icons.refresh),
               label: const Text('Değiştir'),
             ),
-          ] else ...[
+          ] else
             GestureDetector(
               onTap: onPick,
               child: Container(
@@ -504,7 +903,6 @@ class _AddDataScreenState extends State<AddDataScreen> {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: isDark ? Colors.grey.shade600 : Colors.grey.shade300,
-                    style: BorderStyle.solid,
                   ),
                 ),
                 child: Center(
@@ -529,103 +927,13 @@ class _AddDataScreenState extends State<AddDataScreen> {
                 ),
               ),
             ),
-          ],
         ],
       ),
     );
   }
 
-  List<Widget> _buildProcessSelections() {
-    List<Widget> widgets = [];
-
-    _selectedProcesses.forEach((processType, isSelected) {
-      String processName =
-          processType == 'cutting'
-              ? 'Kesme'
-              : processType == 'engraving'
-              ? 'Kazıma'
-              : 'Çizme';
-
-      widgets.add(
-        CheckboxListTile(
-          title: Text(processName),
-          value: isSelected,
-          onChanged:
-              (value) => setState(
-                () => _selectedProcesses[processType] = value ?? false,
-              ),
-        ),
-      );
-
-      if (isSelected) {
-        final controllers = _processControllers[processType]!;
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.only(left: 32, right: 16, bottom: 16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: CustomTextField(
-                        controller: controllers['power']!,
-                        label: 'Güç (%)',
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: CustomTextField(
-                        controller: controllers['speed']!,
-                        label: 'Hız (mm/s)',
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: CustomTextField(
-                        controller: controllers['passes']!,
-                        label: 'Geçiş',
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Text('Kalite: ${_qualityScores[processType]!.toInt()}/10'),
-                    Expanded(
-                      child: Slider(
-                        value: _qualityScores[processType]!,
-                        min: 0,
-                        max: 10,
-                        divisions: 10,
-                        label: _qualityScores[processType]!.toInt().toString(),
-                        onChanged:
-                            (value) => setState(
-                              () => _qualityScores[processType] = value,
-                            ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-    });
-
-    return widgets;
-  }
-
   @override
   void dispose() {
-    _machineBrandController.dispose();
-    _laserPowerController.dispose();
-    _materialTypeController.dispose();
-    _thicknessController.dispose();
     _processControllers.values.forEach(
       (c) => c.values.forEach((ctrl) => ctrl.dispose()),
     );

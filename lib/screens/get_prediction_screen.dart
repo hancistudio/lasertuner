@@ -4,7 +4,6 @@ import '../models/prediction_model.dart';
 import '../models/experiment_model.dart';
 import '../services/ml_service.dart';
 import '../services/gemini_ai_service.dart';
-import '../widgets/custom_button.dart';
 
 class GetPredictionScreen extends StatefulWidget {
   const GetPredictionScreen({super.key});
@@ -15,25 +14,25 @@ class GetPredictionScreen extends StatefulWidget {
 
 class _GetPredictionScreenState extends State<GetPredictionScreen>
     with SingleTickerProviderStateMixin {
-  // ✅ Services
+  // Services
   final MLService _mlService = MLService();
   final GeminiAIService _geminiService = GeminiAIService();
 
-  // ✅ Controllers
-  final TextEditingController _machineBrandController = TextEditingController();
-  final TextEditingController _laserPowerController = TextEditingController();
-  final TextEditingController _materialTypeController = TextEditingController();
-  final TextEditingController _thicknessController = TextEditingController();
-
-  // ✅ State
+  // State
   bool _isLoading = false;
   bool _apiHealthy = false;
   bool _isCheckingHealth = true;
   PredictionResponse? _mlPrediction;
   PredictionResponse? _geminiPrediction;
-  String? _selectedPredictionSource; // 'ml' veya 'gemini'
+  String? _selectedPredictionSource;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+
+  // Seçili değerler
+  String? _selectedMachine;
+  double? _selectedPower;
+  String? _selectedMaterial;
+  double? _selectedThickness;
 
   final Map<String, bool> _selectedProcesses = {
     'cutting': false,
@@ -41,42 +40,15 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     'scoring': false,
   };
 
-  // ✅ Popüler seçenekler
-  final List<String> popularMachines = [
-    'xTool D1 Pro',
-    'Atomstack A5',
-    'Ortur Laser Master 3',
-    'Sculpfun S9',
-    'Creality Falcon',
-    'TwoTrees',
-    'Diğer',
-  ];
-
-  final List<String> popularMaterials = [
-    'Ahşap',
-    'MDF',
-    'Karton',
-    'Deri',
-    'Keçe',
-    'Kumaş',
-    'Kağıt',
-    'Köpük',
-    'Mantar',
-    'Diğer',
-  ];
-
-  final List<double> popularPowers = [5, 10, 15, 20, 30, 40];
-  final List<double> popularThickness = [1, 2, 3, 4, 5, 6, 8];
-
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 600),
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeIn),
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
     _checkApiHealth();
   }
@@ -84,10 +56,6 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
   @override
   void dispose() {
     _animationController.dispose();
-    _machineBrandController.dispose();
-    _laserPowerController.dispose();
-    _materialTypeController.dispose();
-    _thicknessController.dispose();
     super.dispose();
   }
 
@@ -102,18 +70,6 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
           _apiHealthy = isHealthy;
           _isCheckingHealth = false;
         });
-
-        if (isHealthy) {
-          _showSnackBar(
-            '✅ ML servisi aktif ve hazır!',
-            backgroundColor: Colors.green,
-          );
-        } else {
-          _showSnackBar(
-            '⚠️ ML servisi yanıt vermiyor. Gemini AI kullanılabilir.',
-            backgroundColor: Colors.orange,
-          );
-        }
       }
     } catch (e) {
       if (mounted) {
@@ -121,66 +77,59 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
           _apiHealthy = false;
           _isCheckingHealth = false;
         });
-        _showSnackBar(
-          '⚠️ API bağlantısı kurulamadı. Gemini AI kullanın.',
-          backgroundColor: Colors.orange,
-        );
       }
     }
   }
 
   bool _validateInputs() {
-    if (_machineBrandController.text.isEmpty ||
-        _laserPowerController.text.isEmpty ||
-        _materialTypeController.text.isEmpty ||
-        _thicknessController.text.isEmpty) {
-      _showSnackBar('❌ Lütfen tüm alanları doldurun');
+    if (_selectedMachine == null) {
+      _showSnackBar('⚠️ Lütfen makine seçin', isError: true);
       return false;
     }
-
-    // Malzeme kontrolü
-    for (String unsupported in AppConfig.UNSUPPORTED_MATERIALS) {
-      if (_materialTypeController.text.toLowerCase().contains(
-        unsupported.toLowerCase(),
-      )) {
-        _showSnackBar(
-          '⚠️ ${_materialTypeController.text} diode lazer için uygun değil! CO2 lazer gerektirir.',
-          backgroundColor: Colors.red,
-        );
-        return false;
-      }
-    }
-
-    // Güç ve kalınlık kontrolü
-    final power = double.tryParse(_laserPowerController.text) ?? 0;
-    final thickness = double.tryParse(_thicknessController.text) ?? 0;
-
-    if (power < AppConfig.MIN_LASER_POWER ||
-        power > AppConfig.MAX_LASER_POWER) {
-      _showSnackBar(
-        '⚠️ Lazer gücü ${AppConfig.MIN_LASER_POWER}W - ${AppConfig.MAX_LASER_POWER}W arasında olmalı!',
-        backgroundColor: Colors.red,
-      );
+    if (_selectedPower == null) {
+      _showSnackBar('⚠️ Lütfen lazer gücü seçin', isError: true);
       return false;
     }
-
-    if (thickness > AppConfig.MAX_THICKNESS) {
-      _showSnackBar(
-        '⚠️ Diode lazerler max ${AppConfig.MAX_THICKNESS}mm kesebilir!',
-        backgroundColor: Colors.orange,
-      );
+    if (_selectedMaterial == null) {
+      _showSnackBar('⚠️ Lütfen malzeme seçin', isError: true);
       return false;
     }
-
+    if (_selectedThickness == null) {
+      _showSnackBar('⚠️ Lütfen kalınlık seçin', isError: true);
+      return false;
+    }
     if (!_selectedProcesses.containsValue(true)) {
-      _showSnackBar('❌ En az bir işlem tipi seçin');
+      _showSnackBar('⚠️ En az bir işlem tipi seçin', isError: true);
+      return false;
+    }
+
+    // Makine-Malzeme uyumluluğu kontrolü
+    final machineMaxThickness = AppConfig.getMaxThicknessForMachine(
+      _selectedMachine!,
+    );
+    final materialMaxThickness = AppConfig.getMaxThicknessForMaterial(
+      _selectedMaterial!,
+    );
+
+    if (_selectedThickness! > machineMaxThickness) {
+      _showSnackBar(
+        '⚠️ $_selectedMachine maksimum $machineMaxThickness mm kesebilir!',
+        isError: true,
+      );
+      return false;
+    }
+
+    if (_selectedThickness! > materialMaxThickness) {
+      _showSnackBar(
+        '⚠️ ${AppConfig.getMaterialDisplayName(_selectedMaterial!)} için maksimum kalınlık $materialMaxThickness mm!',
+        isError: true,
+      );
       return false;
     }
 
     return true;
   }
 
-  // 🤖 ML API ile tahmin al
   Future<void> _getPredictionFromML() async {
     if (!_validateInputs()) return;
 
@@ -194,24 +143,16 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
       final request = _buildPredictionRequest();
       final response = await _mlService.getPrediction(request);
 
-      setState(() {
-        _mlPrediction = response;
-      });
-
+      setState(() => _mlPrediction = response);
       _animationController.forward(from: 0);
-      _showSnackBar(
-        '✅ ML tahmini başarıyla alındı!',
-        backgroundColor: Colors.green,
-      );
+      _showSnackBar('✅ ML tahmini başarıyla alındı!');
     } catch (e) {
-      print('❌ ML prediction error: $e');
-      _showSnackBar('❌ ML tahmini alınamadı: $e');
+      _showSnackBar('❌ ML tahmini alınamadı: $e', isError: true);
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  // 🧠 Gemini AI ile tahmin al
   Future<void> _getPredictionFromGemini() async {
     if (!_validateInputs()) return;
 
@@ -225,24 +166,16 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
       final request = _buildPredictionRequest();
       final response = await _geminiService.getPredictionWithGemini(request);
 
-      setState(() {
-        _geminiPrediction = response;
-      });
-
+      setState(() => _geminiPrediction = response);
       _animationController.forward(from: 0);
-      _showSnackBar(
-        '✅ Gemini AI tahmini başarıyla alındı!',
-        backgroundColor: Colors.purple,
-      );
+      _showSnackBar('✅ Gemini AI tahmini başarıyla alındı!');
     } catch (e) {
-      print('❌ Gemini prediction error: $e');
-      _showSnackBar('❌ Gemini AI tahmini alınamadı: $e');
+      _showSnackBar('❌ Gemini AI tahmini alınamadı: $e', isError: true);
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  // 🔀 Her iki tahmini karşılaştır
   Future<void> _getComparativePredictions() async {
     if (!_validateInputs()) return;
 
@@ -256,10 +189,8 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     try {
       final request = _buildPredictionRequest();
 
-      // Paralel olarak her iki tahmini al
       final results = await Future.wait([
         _mlService.getPrediction(request).catchError((e) {
-          print('ML error: $e');
           return _mlService.generateFallbackPrediction(request);
         }),
         _geminiService.getPredictionWithGemini(request),
@@ -271,13 +202,9 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
       });
 
       _animationController.forward(from: 0);
-      _showSnackBar(
-        '✅ Her iki tahmin de alındı! Karşılaştırabilirsiniz.',
-        backgroundColor: Colors.blue,
-      );
+      _showSnackBar('✅ Her iki tahmin de alındı!');
     } catch (e) {
-      print('❌ Comparative prediction error: $e');
-      _showSnackBar('❌ Tahminler alınamadı: $e');
+      _showSnackBar('❌ Tahminler alınamadı: $e', isError: true);
     } finally {
       setState(() => _isLoading = false);
     }
@@ -291,43 +218,70 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
             .toList();
 
     return PredictionRequest(
-      machineBrand: _machineBrandController.text,
-      laserPower: double.parse(_laserPowerController.text),
-      materialType: _materialTypeController.text,
-      materialThickness: double.parse(_thicknessController.text),
+      machineBrand: _selectedMachine!,
+      laserPower: _selectedPower!,
+      materialType: AppConfig.getMaterialDisplayName(_selectedMaterial!),
+      materialThickness: _selectedThickness!,
       processes: selectedProcessList,
     );
   }
 
-  void _showSnackBar(String message, {Color? backgroundColor}) {
+  void _showSnackBar(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
-        backgroundColor: backgroundColor,
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline : Icons.check_circle_outline,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: isError ? Colors.red.shade600 : Colors.green.shade600,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        duration: const Duration(seconds: 3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: Duration(seconds: isError ? 4 : 3),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isLargeScreen = screenWidth > 600;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final size = MediaQuery.of(context).size;
+
+    final isMobile = size.width < 600;
+    final isTablet = size.width >= 600 && size.width < 900;
+    final isDesktop = size.width >= 900;
+
+    final horizontalPadding =
+        isMobile
+            ? 16.0
+            : isTablet
+            ? 32.0
+            : 48.0;
+    final cardPadding = isMobile ? 16.0 : 24.0;
 
     return Scaffold(
+      backgroundColor: isDark ? Colors.grey.shade900 : Colors.grey.shade50,
       appBar: AppBar(
         title: const Text(
           'Parametre Tahmini',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Colors.green,
+        centerTitle: true,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.green.shade700, Colors.green.shade500],
+            ),
+          ),
+        ),
         actions: [
-          // API Status
           if (_isCheckingHealth)
             const Padding(
               padding: EdgeInsets.all(16.0),
@@ -341,112 +295,103 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               ),
             )
           else
-            IconButton(
-              icon: Icon(
-                _apiHealthy ? Icons.cloud_done : Icons.cloud_off,
-                color: _apiHealthy ? Colors.white : Colors.orange,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        _apiHealthy
+                            ? Colors.white.withOpacity(0.2)
+                            : Colors.orange.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _apiHealthy ? Icons.cloud_done : Icons.cloud_off,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        _apiHealthy ? 'Online' : 'Offline',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              onPressed: _checkApiHealth,
-              tooltip:
-                  _apiHealthy ? 'ML Servisi Aktif' : 'ML Servisi Bağlantı Yok',
             ),
           IconButton(
-            icon: const Icon(Icons.info_outline, color: Colors.white),
+            icon: const Icon(Icons.info_outline),
             onPressed: _showInfoDialog,
+            tooltip: 'Bilgi',
           ),
         ],
       ),
       body: SingleChildScrollView(
         child: Center(
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 1000),
-            padding: EdgeInsets.all(isLargeScreen ? 24 : 16),
+            constraints: BoxConstraints(
+              maxWidth: isDesktop ? 1200 : double.infinity,
+            ),
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: isMobile ? 16 : 24,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // API Status Card
-                if (!_apiHealthy && !_isCheckingHealth) _buildApiStatusCard(),
+                _buildHeroBanner(isDark, isMobile),
+                SizedBox(height: isMobile ? 20 : 32),
 
-                // Info Card
-                _buildInfoCard(isDark),
-                const SizedBox(height: 24),
+                if (isDesktop)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: _buildFormSection(isDark, cardPadding, isMobile),
+                      ),
+                      const SizedBox(width: 24),
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          children: [
+                            _buildActionButtons(isMobile),
+                            const SizedBox(height: 16),
+                            _buildQuickTipsCard(isDark, cardPadding),
+                          ],
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Column(
+                    children: [
+                      _buildFormSection(isDark, cardPadding, isMobile),
+                      SizedBox(height: isMobile ? 20 : 24),
+                      _buildActionButtons(isMobile),
+                      const SizedBox(height: 16),
+                      _buildQuickTipsCard(isDark, cardPadding),
+                    ],
+                  ),
 
-                // Makine Bilgileri
-                _buildSectionCard(
-                  title: '🔧 Makine Bilgileri',
-                  isDark: isDark,
-                  isLarge: isLargeScreen,
-                  children: [
-                    _buildDropdownField(
-                      label: 'Makine Marka/Model',
-                      controller: _machineBrandController,
-                      options: popularMachines,
-                      icon: Icons.precision_manufacturing,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildChipSelector(
-                      label: 'Lazer Gücü (W)',
-                      controller: _laserPowerController,
-                      options: popularPowers,
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Malzeme Bilgileri
-                _buildSectionCard(
-                  title: '📦 Malzeme Bilgileri',
-                  isDark: isDark,
-                  isLarge: isLargeScreen,
-                  children: [
-                    _buildDropdownField(
-                      label: 'Malzeme Türü',
-                      controller: _materialTypeController,
-                      options: popularMaterials,
-                      icon: Icons.category,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildChipSelector(
-                      label: 'Kalınlık (mm)',
-                      controller: _thicknessController,
-                      options: popularThickness,
-                      isDark: isDark,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // İşlem Tipleri
-                _buildSectionCard(
-                  title: '⚙️ İşlem Tipleri',
-                  isDark: isDark,
-                  isLarge: isLargeScreen,
-                  children: [
-                    _buildProcessCheckbox(
-                      'Kesme',
-                      'cutting',
-                      Icons.content_cut,
-                    ),
-                    _buildProcessCheckbox('Kazıma', 'engraving', Icons.draw),
-                    _buildProcessCheckbox(
-                      'Çizme',
-                      'scoring',
-                      Icons.border_style,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // 🎯 TAHMİN BUTONLARI
-                _buildPredictionButtons(isLargeScreen),
-
-                // Sonuçlar
                 if (_mlPrediction != null || _geminiPrediction != null) ...[
-                  const SizedBox(height: 24),
+                  SizedBox(height: isMobile ? 24 : 32),
                   FadeTransition(
                     opacity: _fadeAnimation,
-                    child: _buildPredictionResults(isDark, isLargeScreen),
+                    child: _buildPredictionResults(isDark, isMobile, isDesktop),
                   ),
                 ],
               ],
@@ -457,400 +402,863 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     );
   }
 
-  // 🎯 TAHMİN BUTONLARI
-  Widget _buildPredictionButtons(bool isLargeScreen) {
-    return Column(
-      children: [
-        // ML API Butonu
-        CustomButton(
-          text: '🤖 ML API ile Tahmin Al',
-          onPressed: _isLoading ? null : _getPredictionFromML,
-          isLoading: _isLoading && _selectedPredictionSource == 'ml',
-          backgroundColor: Colors.green,
+  Widget _buildHeroBanner(bool isDark, bool isMobile) {
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 20 : 32),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green.shade600, Colors.green.shade400],
         ),
-        const SizedBox(height: 12),
-
-        // Gemini AI Butonu
-        CustomButton(
-          text: '🧠 Gemini AI ile Tahmin Al',
-          onPressed: _isLoading ? null : _getPredictionFromGemini,
-          isLoading: _isLoading && _selectedPredictionSource == 'gemini',
-          backgroundColor: Colors.purple,
-        ),
-        const SizedBox(height: 12),
-
-        // Karşılaştırmalı Tahmin Butonu
-        CustomButton(
-          text: '🔀 Her İkisini Karşılaştır',
-          onPressed: _isLoading ? null : _getComparativePredictions,
-          isLoading: _isLoading && _selectedPredictionSource == 'both',
-          backgroundColor: Colors.blue,
-        ),
-      ],
-    );
-  }
-
-  // API Status Card
-  Widget _buildApiStatusCard() {
-    return Card(
-      color: Colors.orange.shade50,
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(
-              Icons.warning_amber_rounded,
-              color: Colors.orange.shade700,
-              size: 32,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'ML API Bağlantısı Yok',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.orange.shade900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Gemini AI kullanabilir veya bağlantıyı tekrar deneyebilirsiniz.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.orange.shade800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            TextButton(
-              onPressed: _checkApiHealth,
-              child: const Text('Tekrar Dene'),
-            ),
-          ],
-        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.green.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-    );
-  }
-
-  // Info Card
-  Widget _buildInfoCard(bool isDark) {
-    return Card(
-      color: Colors.green.shade50,
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(
-              Icons.lightbulb_outline,
-              color: Colors.green.shade700,
-              size: 32,
+      child: Column(
+        children: [
+          Icon(
+            Icons.auto_awesome,
+            size: isMobile ? 48 : 64,
+            color: Colors.white,
+          ),
+          SizedBox(height: isMobile ? 12 : 16),
+          Text(
+            'Akıllı Parametre Tahmini',
+            style: TextStyle(
+              fontSize: isMobile ? 24 : 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Akıllı Tahmin Sistemi',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.green.shade900,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'ML API (topluluk verisi) veya Gemini AI (yapay zeka) ile tahmin alın.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.green.shade800,
-                    ),
-                  ),
-                ],
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: isMobile ? 8 : 12),
+          Text(
+            'Makinenizi ve malzemenizi seçin, AI en uygun ayarları önersin',
+            style: TextStyle(
+              fontSize: isMobile ? 14 : 16,
+              color: Colors.white.withOpacity(0.9),
+            ),
+            textAlign: TextAlign.center,
+          ),
+          if (!_apiHealthy && !_isCheckingHealth) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.3)),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Info Dialog
-  void _showInfoDialog() {
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.blue),
-                SizedBox(width: 12),
-                Text('Tahmin Kaynakları'),
-              ],
-            ),
-            content: SingleChildScrollView(
-              child: Column(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildInfoSection(
-                    '🤖 ML API',
-                    'Topluluk deneylerinden öğrenen makine öğrenmesi modeli. '
-                        'Gerçek kullanıcı verilerine dayalı tahminler.',
+                  const Icon(
+                    Icons.warning_amber,
+                    color: Colors.white,
+                    size: 20,
                   ),
-                  const SizedBox(height: 16),
-                  _buildInfoSection(
-                    '🧠 Gemini AI',
-                    'Google\'ın yapay zeka modeli. Geniş bilgi tabanından '
-                        'akıllı öneriler sunar.',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildInfoSection(
-                    '🔀 Karşılaştırma',
-                    'Her iki kaynaktan da tahmin alıp karşılaştırabilirsiniz. '
-                        'En uygun parametreleri seçin.',
-                  ),
-                  const SizedBox(height: 16),
-                  const Divider(),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '✅ Desteklenen Malzemeler:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  ...AppConfig.SUPPORTED_MATERIALS
-                      .map((m) => Text('  • $m'))
-                      .toList(),
-                  const SizedBox(height: 12),
-                  const Text(
-                    '❌ Desteklenmeyen:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      'ML API çevrimdışı - Gemini AI kullanılabilir',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isMobile ? 12 : 14,
+                      ),
                     ),
                   ),
-                  ...AppConfig.UNSUPPORTED_MATERIALS
-                      .map(
-                        (m) => Text(
-                          '  • $m (CO2 gerektirir)',
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 12,
-                          ),
-                        ),
-                      )
-                      .toList(),
                 ],
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Tamam'),
-              ),
-            ],
-          ),
+          ],
+        ],
+      ),
     );
   }
 
-  Widget _buildInfoSection(String title, String description) {
+  Widget _buildFormSection(bool isDark, double padding, bool isMobile) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-        ),
-        const SizedBox(height: 4),
-        Text(description, style: const TextStyle(fontSize: 13, height: 1.4)),
+        _buildMachineCard(isDark, padding, isMobile),
+        SizedBox(height: isMobile ? 16 : 20),
+        _buildMaterialCard(isDark, padding, isMobile),
+        SizedBox(height: isMobile ? 16 : 20),
+        _buildProcessCard(isDark, padding, isMobile),
       ],
     );
   }
 
-  // Section Card
-  Widget _buildSectionCard({
-    required String title,
-    required bool isDark,
-    required bool isLarge,
-    required List<Widget> children,
-  }) {
+  Widget _buildMachineCard(bool isDark, double padding, bool isMobile) {
     return Card(
-      elevation: isDark ? 2 : 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
-        padding: EdgeInsets.all(isLarge ? 20 : 16),
+        padding: EdgeInsets.all(padding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: isLarge ? 18 : 16,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.precision_manufacturing,
+                    color: Colors.green,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Makine Seçimi',
+                        style: TextStyle(
+                          fontSize: isMobile ? 18 : 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Kullandığınız lazer kesim makinesini seçin',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            ...children,
+            const SizedBox(height: 20),
+
+            // Makine Grid
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: isMobile ? 2 : 3,
+                childAspectRatio: 2.5,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemCount: AppConfig.SUPPORTED_MACHINES.length,
+              itemBuilder: (context, index) {
+                final machine = AppConfig.SUPPORTED_MACHINES[index];
+                final machineName = machine['name'] as String;
+                final isSelected = _selectedMachine == machineName;
+
+                return InkWell(
+                  onTap: () {
+                    setState(() {
+                      _selectedMachine = machineName;
+                      _selectedPower = machine['defaultPower'] as double;
+                    });
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color:
+                          isSelected
+                              ? Colors.green.withOpacity(0.1)
+                              : Colors.grey.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? Colors.green : Colors.grey.shade300,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          machine['icon'] as String,
+                          style: TextStyle(fontSize: isMobile ? 20 : 24),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          machineName,
+                          style: TextStyle(
+                            fontSize: isMobile ? 11 : 12,
+                            fontWeight:
+                                isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                            color: isSelected ? Colors.green : Colors.black87,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            if (_selectedMachine != null) ...[
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 16),
+
+              // Lazer Gücü Seçimi
+              Text(
+                'Lazer Gücü',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    AppConfig.getPowerRangeForMachine(_selectedMachine!).map((
+                      power,
+                    ) {
+                      final isSelected = _selectedPower == power;
+                      return ChoiceChip(
+                        label: Text('${power.toInt()}W'),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(
+                            () => _selectedPower = selected ? power : null,
+                          );
+                        },
+                        selectedColor: Colors.green,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black87,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      );
+                    }).toList(),
+              ),
+
+              if (_selectedPower != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.blue.shade700,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Seçili: $_selectedMachine - ${_selectedPower!.toInt()}W',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.blue.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ],
         ),
       ),
     );
   }
 
-  // Dropdown Field
-  Widget _buildDropdownField({
-    required String label,
-    required TextEditingController controller,
-    required List<String> options,
-    required IconData icon,
-  }) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-        suffixIcon: PopupMenuButton<String>(
-          icon: const Icon(Icons.arrow_drop_down, color: Colors.green),
-          onSelected: (value) {
-            if (value == 'Diğer') {
-              controller.clear();
-            } else {
-              controller.text = value;
-            }
-          },
-          itemBuilder: (context) {
-            return options.map((option) {
-              return PopupMenuItem<String>(
-                value: option,
-                child: Row(
-                  children: [
-                    Icon(icon, size: 20, color: Colors.green),
-                    const SizedBox(width: 8),
-                    Text(option),
-                  ],
-                ),
-              );
-            }).toList();
-          },
-        ),
-      ),
-    );
-  }
-
-  // Chip Selector
-  Widget _buildChipSelector({
-    required String label,
-    required TextEditingController controller,
-    required List<double> options,
-    required bool isDark,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: isDark ? Colors.grey.shade400 : Colors.grey.shade700,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children:
-              options.map((value) {
-                final isSelected = controller.text == value.toString();
-                return ChoiceChip(
-                  label: Text('$value'),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() {
-                      controller.text = selected ? value.toString() : '';
-                    });
-                  },
-                  selectedColor: Colors.green,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : null,
-                    fontWeight: isSelected ? FontWeight.bold : null,
+  Widget _buildMaterialCard(bool isDark, double padding, bool isMobile) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: EdgeInsets.all(padding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                );
-              }).toList(),
+                  child: const Icon(Icons.category, color: Colors.orange),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Malzeme Seçimi',
+                        style: TextStyle(
+                          fontSize: isMobile ? 18 : 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Kesim yapacağınız malzemeyi seçin',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Malzeme Kategorileri
+            ...AppConfig.MATERIAL_CATEGORIES.entries.map((category) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      category.key,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children:
+                        category.value.map((material) {
+                          final materialKey = material['key'] as String;
+                          final isSelected = _selectedMaterial == materialKey;
+                          final hasWarning = material['warning'] != null;
+
+                          return ChoiceChip(
+                            label: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(material['icon'] as String),
+                                const SizedBox(width: 4),
+                                Text(material['name'] as String),
+                                if (hasWarning) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.warning_amber,
+                                    size: 14,
+                                    color:
+                                        isSelected
+                                            ? Colors.white
+                                            : Colors.orange,
+                                  ),
+                                ],
+                              ],
+                            ),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedMaterial =
+                                    selected ? materialKey : null;
+                                // Seçilen malzemeye uygun kalınlık sıfırla
+                                if (selected) {
+                                  final maxThickness =
+                                      AppConfig.getMaxThicknessForMaterial(
+                                        materialKey,
+                                      );
+                                  if (_selectedThickness != null &&
+                                      _selectedThickness! > maxThickness) {
+                                    _selectedThickness = null;
+                                  }
+                                }
+                              });
+                            },
+                            selectedColor: Colors.orange,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black87,
+                              fontWeight:
+                                  isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                              fontSize: 13,
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              );
+            }).toList(),
+
+            if (_selectedMaterial != null) ...[
+              const Divider(),
+              const SizedBox(height: 16),
+
+              // Kalınlık Seçimi
+              Row(
+                children: [
+                  Text(
+                    'Kalınlık (mm)',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Max: ${AppConfig.getMaxThicknessForMaterial(_selectedMaterial!).toInt()}mm',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.orange.shade900,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    AppConfig.THICKNESS_VALUES
+                        .where(
+                          (t) =>
+                              t <=
+                              AppConfig.getMaxThicknessForMaterial(
+                                _selectedMaterial!,
+                              ),
+                        )
+                        .map((thickness) {
+                          final isSelected = _selectedThickness == thickness;
+                          return ChoiceChip(
+                            label: Text('${thickness.toString()} mm'),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(
+                                () =>
+                                    _selectedThickness =
+                                        selected ? thickness : null,
+                              );
+                            },
+                            selectedColor: Colors.blue,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black87,
+                              fontWeight:
+                                  isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                            ),
+                          );
+                        })
+                        .toList(),
+              ),
+
+              if (_selectedThickness != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.green.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.check_circle,
+                        color: Colors.green.shade700,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Seçili: ${AppConfig.getMaterialDisplayName(_selectedMaterial!)} - $_selectedThickness mm (${AppConfig.getMaterialDifficulty(_selectedMaterial!)})',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.green.shade900,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ],
         ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          decoration: InputDecoration(
-            labelText: 'veya manuel girin',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-          keyboardType: TextInputType.number,
-        ),
-      ],
+      ),
     );
   }
 
-  // Process Checkbox
-  Widget _buildProcessCheckbox(String title, String key, IconData icon) {
-    return CheckboxListTile(
-      title: Row(
+  Widget _buildProcessCard(bool isDark, double padding, bool isMobile) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: EdgeInsets.all(padding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.settings, color: Colors.purple),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'İşlem Tipleri',
+                        style: TextStyle(
+                          // get_prediction_screen.dart devamı...
+                          fontSize: isMobile ? 18 : 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Yapılacak işlemleri seçin',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            _buildProcessTile(
+              'Kesme',
+              'cutting',
+              Icons.content_cut,
+              Colors.red,
+            ),
+            _buildProcessTile('Kazıma', 'engraving', Icons.draw, Colors.blue),
+            _buildProcessTile(
+              'Çizme',
+              'scoring',
+              Icons.border_style,
+              Colors.orange,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProcessTile(
+    String title,
+    String key,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color:
+            _selectedProcesses[key]!
+                ? color.withOpacity(0.1)
+                : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _selectedProcesses[key]! ? color : Colors.grey.shade300,
+        ),
+      ),
+      child: CheckboxListTile(
+        title: Row(
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontWeight:
+                    _selectedProcesses[key]!
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+        value: _selectedProcesses[key],
+        onChanged: (value) {
+          setState(() => _selectedProcesses[key] = value ?? false);
+        },
+        activeColor: color,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons(bool isMobile) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: EdgeInsets.all(isMobile ? 16 : 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Tahmin Kaynağı Seçin',
+              style: TextStyle(
+                fontSize: isMobile ? 16 : 18,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+
+            _buildPredictionButton(
+              icon: Icons.smart_toy,
+              label: 'ML API',
+              subtitle: 'Topluluk verisi',
+              color: Colors.green,
+              isLoading: _isLoading && _selectedPredictionSource == 'ml',
+              onPressed: _getPredictionFromML,
+            ),
+            const SizedBox(height: 12),
+
+            _buildPredictionButton(
+              icon: Icons.psychology,
+              label: 'Gemini AI',
+              subtitle: 'Yapay zeka',
+              color: Colors.purple,
+              isLoading: _isLoading && _selectedPredictionSource == 'gemini',
+              onPressed: _getPredictionFromGemini,
+            ),
+            const SizedBox(height: 12),
+
+            _buildPredictionButton(
+              icon: Icons.compare_arrows,
+              label: 'Karşılaştır',
+              subtitle: 'Her ikisini gör',
+              color: Colors.blue,
+              isLoading: _isLoading && _selectedPredictionSource == 'both',
+              onPressed: _getComparativePredictions,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPredictionButton({
+    required IconData icon,
+    required String label,
+    required String subtitle,
+    required Color color,
+    required bool isLoading,
+    required VoidCallback onPressed,
+  }) {
+    return ElevatedButton(
+      onPressed: _isLoading ? null : onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 2,
+      ),
+      child:
+          isLoading
+              ? const SizedBox(
+                height: 24,
+                width: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+              : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 24),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+    );
+  }
+
+  Widget _buildQuickTipsCard(bool isDark, double padding) {
+    return Card(
+      elevation: 2,
+      color: Colors.blue.shade50,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: EdgeInsets.all(padding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.tips_and_updates, color: Colors.blue.shade700),
+                const SizedBox(width: 8),
+                Text(
+                  'Hızlı İpuçları',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade900,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildTipItem(
+              '✓ Her makine için önerilen güç değerlerini kullanın',
+            ),
+            _buildTipItem('✓ Malzeme kalınlığını doğru seçin'),
+            _buildTipItem('✓ İlk denemede düşük güçle başlayın'),
+            _buildTipItem('✓ Ahşap için 2-5mm kalınlık idealdir'),
+            _buildTipItem('⚠ Metal ve cam kesimi desteklenmez'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTipItem(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Colors.green),
+          Text(
+            text.substring(0, 1),
+            style: TextStyle(fontSize: 16, color: Colors.blue.shade700),
+          ),
           const SizedBox(width: 8),
-          Text(title),
+          Expanded(
+            child: Text(
+              text.substring(2),
+              style: TextStyle(fontSize: 13, color: Colors.blue.shade900),
+            ),
+          ),
         ],
       ),
-      value: _selectedProcesses[key],
-      onChanged: (value) {
-        setState(() => _selectedProcesses[key] = value ?? false);
-      },
-      activeColor: Colors.green,
     );
   }
 
-  // 📊 SONUÇLAR
-  Widget _buildPredictionResults(bool isDark, bool isLargeScreen) {
+  Widget _buildPredictionResults(bool isDark, bool isMobile, bool isDesktop) {
     if (_selectedPredictionSource == 'both') {
-      // Karşılaştırmalı görünüm
-      return Column(
-        children: [
-          if (_mlPrediction != null)
-            _buildSinglePredictionCard(
-              _mlPrediction!,
-              '🤖 ML API Tahmini',
-              Colors.green,
-              isDark,
-              isLargeScreen,
-            ),
-          const SizedBox(height: 16),
-          if (_geminiPrediction != null)
-            _buildSinglePredictionCard(
-              _geminiPrediction!,
-              '🧠 Gemini AI Tahmini',
-              Colors.purple,
-              isDark,
-              isLargeScreen,
-            ),
-        ],
-      );
+      return isDesktop
+          ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_mlPrediction != null)
+                Expanded(
+                  child: _buildSinglePredictionCard(
+                    _mlPrediction!,
+                    '🤖 ML API',
+                    Colors.green,
+                    isDark,
+                    isMobile,
+                  ),
+                ),
+              const SizedBox(width: 16),
+              if (_geminiPrediction != null)
+                Expanded(
+                  child: _buildSinglePredictionCard(
+                    _geminiPrediction!,
+                    '🧠 Gemini AI',
+                    Colors.purple,
+                    isDark,
+                    isMobile,
+                  ),
+                ),
+            ],
+          )
+          : Column(
+            children: [
+              if (_mlPrediction != null)
+                _buildSinglePredictionCard(
+                  _mlPrediction!,
+                  '🤖 ML API',
+                  Colors.green,
+                  isDark,
+                  isMobile,
+                ),
+              const SizedBox(height: 16),
+              if (_geminiPrediction != null)
+                _buildSinglePredictionCard(
+                  _geminiPrediction!,
+                  '🧠 Gemini AI',
+                  Colors.purple,
+                  isDark,
+                  isMobile,
+                ),
+            ],
+          );
     } else if (_selectedPredictionSource == 'ml' && _mlPrediction != null) {
       return _buildSinglePredictionCard(
         _mlPrediction!,
         '🤖 ML API Tahmini',
         Colors.green,
         isDark,
-        isLargeScreen,
+        isMobile,
       );
     } else if (_selectedPredictionSource == 'gemini' &&
         _geminiPrediction != null) {
@@ -859,7 +1267,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
         '🧠 Gemini AI Tahmini',
         Colors.purple,
         isDark,
-        isLargeScreen,
+        isMobile,
       );
     }
 
@@ -871,155 +1279,129 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     String title,
     Color accentColor,
     bool isDark,
-    bool isLarge,
+    bool isMobile,
   ) {
     return Card(
       elevation: 4,
-      color: isDark ? Colors.grey.shade900 : Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         side: BorderSide(color: accentColor.withOpacity(0.5), width: 2),
       ),
-      child: Padding(
-        padding: EdgeInsets.all(isLarge ? 24 : 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Başlık
-            Row(
-              children: [
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [accentColor.withOpacity(0.05), Colors.white],
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(isMobile ? 20 : 28),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: accentColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      Icons.check_circle,
+                      color: accentColor,
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: isMobile ? 20 : 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          result.dataSource == 'gemini_ai'
+                              ? 'Yapay Zeka Önerisi'
+                              : 'Topluluk Verisi',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              _buildConfidenceIndicator(result, accentColor, isMobile),
+              const SizedBox(height: 24),
+
+              ...result.predictions.entries.map((entry) {
+                return _buildProcessResult(entry, accentColor, isMobile);
+              }).toList(),
+
+              if (result.notes.isNotEmpty) ...[
+                const SizedBox(height: 20),
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: accentColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: accentColor.withOpacity(0.3)),
                   ),
-                  child: Icon(Icons.check_circle, color: accentColor, size: 32),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: isLarge ? 20 : 18,
-                          fontWeight: FontWeight.bold,
-                          color: isDark ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        result.dataSource == 'gemini_ai'
-                            ? 'Yapay Zeka Önerisi'
-                            : 'Topluluk Verisi',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color:
-                              isDark
-                                  ? Colors.grey.shade400
-                                  : Colors.grey.shade600,
+                      Icon(Icons.info_outline, color: accentColor, size: 22),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          result.notes,
+                          style: const TextStyle(fontSize: 14, height: 1.5),
                         ),
                       ),
                     ],
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 20),
-
-            // Güven Skoru
-            _buildConfidenceScore(result, accentColor, isDark, isLarge),
-            const SizedBox(height: 20),
-
-            // Parametreler
-            ...result.predictions.entries.map((entry) {
-              return _buildProcessResult(entry, accentColor, isDark, isLarge);
-            }).toList(),
-
-            // Notlar
-            if (result.notes.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: accentColor.withOpacity(0.3)),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.info_outline, color: accentColor, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        result.notes,
-                        style: TextStyle(
-                          color: isDark ? Colors.white : Colors.black87,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildConfidenceScore(
+  Widget _buildConfidenceIndicator(
     PredictionResponse result,
-    Color accentColor,
-    bool isDark,
-    bool isLarge,
+    Color color,
+    bool isMobile,
   ) {
     final confidence = result.confidenceScore;
     final percentage = (confidence * 100).toInt();
 
     return Container(
-      padding: EdgeInsets.all(isLarge ? 16 : 12),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [accentColor.withOpacity(0.1), accentColor.withOpacity(0.05)],
+          colors: [color.withOpacity(0.1), color.withOpacity(0.05)],
         ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentColor.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
-          Icon(Icons.analytics, color: accentColor, size: isLarge ? 28 : 24),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Güven Skoru',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '%$percentage',
-                  style: TextStyle(
-                    fontSize: isLarge ? 24 : 20,
-                    fontWeight: FontWeight.bold,
-                    color: accentColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
           SizedBox(
-            width: isLarge ? 80 : 60,
-            height: isLarge ? 80 : 60,
+            width: isMobile ? 60 : 80,
+            height: isMobile ? 60 : 80,
             child: Stack(
               alignment: Alignment.center,
               children: [
@@ -1027,19 +1409,48 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                   value: confidence,
                   strokeWidth: 6,
                   backgroundColor: Colors.grey.shade300,
-                  valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                  valueColor: AlwaysStoppedAnimation<Color>(color),
                 ),
                 Text(
-                  percentage >= 80
-                      ? '✓'
-                      : percentage >= 60
-                      ? '!'
-                      : '?',
+                  '$percentage%',
                   style: TextStyle(
-                    fontSize: isLarge ? 28 : 24,
-                    color: accentColor,
+                    fontSize: isMobile ? 18 : 22,
+                    fontWeight: FontWeight.bold,
+                    color: color,
                   ),
                 ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Güven Skoru',
+                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  percentage >= 80
+                      ? 'Yüksek Güvenilirlik'
+                      : percentage >= 60
+                      ? 'Orta Güvenilirlik'
+                      : 'Düşük Güvenilirlik',
+                  style: TextStyle(
+                    fontSize: isMobile ? 16 : 18,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+                if (result.dataPointsUsed > 0) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '${result.dataPointsUsed} benzer deney kullanıldı',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1050,9 +1461,8 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
   Widget _buildProcessResult(
     MapEntry<String, ProcessParams> entry,
-    Color accentColor,
-    bool isDark,
-    bool isLarge,
+    Color color,
+    bool isMobile,
   ) {
     String processName =
         entry.key == 'cutting'
@@ -1070,45 +1480,51 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
             : Icons.border_style;
 
     return Container(
-      margin: EdgeInsets.only(bottom: isLarge ? 16 : 12),
-      padding: EdgeInsets.all(isLarge ? 16 : 12),
+      margin: EdgeInsets.only(bottom: isMobile ? 12 : 16),
+      padding: EdgeInsets.all(isMobile ? 16 : 20),
       decoration: BoxDecoration(
-        color: accentColor.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: accentColor.withOpacity(0.2)),
+        color: color.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: accentColor, size: isLarge ? 24 : 20),
-              const SizedBox(width: 8),
+              Icon(icon, color: color, size: isMobile ? 22 : 26),
+              const SizedBox(width: 12),
               Text(
                 processName,
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: isLarge ? 18 : 16,
-                  color: isDark ? Colors.white : Colors.black87,
+                  fontSize: isMobile ? 18 : 20,
                 ),
               ),
             ],
           ),
-          SizedBox(height: isLarge ? 16 : 12),
+          const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildParamChip(
+              _buildParamBadge(
                 'Güç',
                 '${params.power.toStringAsFixed(1)}%',
-                accentColor,
+                color,
+                Icons.bolt,
               ),
-              _buildParamChip(
+              _buildParamBadge(
                 'Hız',
-                '${params.speed.toStringAsFixed(0)} mm/s',
-                accentColor,
+                '${params.speed.toStringAsFixed(0)}',
+                color,
+                Icons.speed,
               ),
-              _buildParamChip('Geçiş', '${params.passes}', accentColor),
+              _buildParamBadge(
+                'Geçiş',
+                '${params.passes}',
+                color,
+                Icons.repeat,
+              ),
             ],
           ),
         ],
@@ -1116,24 +1532,31 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     );
   }
 
-  Widget _buildParamChip(String label, String value, Color color) {
+  Widget _buildParamBadge(
+    String label,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
     return Column(
       children: [
+        Icon(icon, size: 20, color: color),
+        const SizedBox(height: 6),
         Text(
           label,
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
                 color: color.withOpacity(0.3),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
@@ -1141,12 +1564,134 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
             value,
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 14,
+              fontSize: 15,
               color: Colors.white,
             ),
           ),
         ),
       ],
+    );
+  }
+
+  void _showInfoDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.info_outline, color: Colors.blue),
+                ),
+                const SizedBox(width: 12),
+                const Text('Nasıl Çalışır?'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildInfoSection(
+                    '1️⃣ Makine Seçin',
+                    'Kullandığınız diode lazer makinesini seçin. Her makine için uygun güç değerleri gösterilir.',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoSection(
+                    '2️⃣ Malzeme Seçin',
+                    'Kesim yapacağınız malzemeyi seçin. Her malzeme için maksimum kalınlık bilgisi verilir.',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoSection(
+                    '3️⃣ İşlem Seçin',
+                    'Kesme, kazıma veya çizme işlemlerinden birini veya birkaçını seçin.',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInfoSection(
+                    '4️⃣ Tahmin Alın',
+                    'ML API topluluk verilerinden, Gemini AI yapay zekadan önerileri alır. Karşılaştırma ile her ikisini görürsünüz.',
+                  ),
+                  const Divider(height: 32),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.warning_amber,
+                              color: Colors.orange.shade700,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Önemli Uyarılar',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange.shade900,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '• İlk denemede düşük güçle başlayın\n'
+                          '• Metal ve cam kesimi desteklenmez\n'
+                          '• 8mm üzeri kalınlıklar zordur\n'
+                          '• Her zaman test kesimi yapın',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.orange.shade900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Anladım', style: TextStyle(fontSize: 16)),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildInfoSection(String title, String description) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+          ),
+          const SizedBox(height: 6),
+          Text(description, style: const TextStyle(fontSize: 13, height: 1.4)),
+        ],
+      ),
     );
   }
 }

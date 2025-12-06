@@ -4,11 +4,11 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
+import 'package:lasertuner/config/app_config.dart';
 import 'dart:convert';
 import '../models/experiment_model.dart';
 import '../services/firestore_service.dart';
 import '../widgets/custom_button.dart';
-import '../widgets/custom_textfield.dart';
 
 class ResearcherPanelScreen extends StatefulWidget {
   final String userId;
@@ -78,27 +78,34 @@ class _ExperimentDataTab extends StatefulWidget {
   State<_ExperimentDataTab> createState() => _ExperimentDataTabState();
 }
 
+// ========== _ExperimentDataTab İÇİN TAM KOD ==========
+// Bu kodu researcher_panel_screen.dart içindeki _ExperimentDataTab ve _ExperimentDataTabState ile değiştirin
+
 class _ExperimentDataTabState extends State<_ExperimentDataTab> {
   final FirestoreService _firestoreService = FirestoreService();
   final ImagePicker _imagePicker = ImagePicker();
 
-  final TextEditingController _machineBrandController = TextEditingController();
-  final TextEditingController _laserPowerController = TextEditingController();
-  final TextEditingController _materialTypeController = TextEditingController();
-  final TextEditingController _thicknessController = TextEditingController();
+  // ✅ AppConfig entegrasyonu - Dropdown/Chip seçimleri
+  String? _selectedMachine;
+  double? _selectedPower;
+  String? _selectedMaterial;
+  double? _selectedThickness;
 
+  // Fotoğraf değişkenleri
   XFile? _selectedImageFile;
   Uint8List? _webImage;
   XFile? _selectedImageFile2;
   Uint8List? _webImage2;
   bool _isLoading = false;
 
+  // İşlem seçimleri
   final Map<String, bool> _selectedProcesses = {
     'cutting': false,
     'engraving': false,
     'scoring': false,
   };
 
+  // İşlem parametreleri
   final Map<String, Map<String, TextEditingController>> _processControllers = {
     'cutting': {
       'power': TextEditingController(),
@@ -117,6 +124,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
     },
   };
 
+  // Kalite skorları
   final Map<String, double> _qualityScores = {
     'cutting': 5,
     'engraving': 5,
@@ -152,11 +160,21 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
   }
 
   Future<void> _submitData() async {
-    if (_machineBrandController.text.isEmpty ||
-        _laserPowerController.text.isEmpty ||
-        _materialTypeController.text.isEmpty ||
-        _thicknessController.text.isEmpty) {
-      _showSnackBar('Lütfen tüm alanları doldurun');
+    // ✅ Validasyonlar
+    if (_selectedMachine == null) {
+      _showSnackBar('⚠️ Lütfen makine seçin');
+      return;
+    }
+    if (_selectedPower == null) {
+      _showSnackBar('⚠️ Lütfen lazer gücü seçin');
+      return;
+    }
+    if (_selectedMaterial == null) {
+      _showSnackBar('⚠️ Lütfen malzeme seçin');
+      return;
+    }
+    if (_selectedThickness == null) {
+      _showSnackBar('⚠️ Lütfen kalınlık seçin');
       return;
     }
     if (!_selectedProcesses.containsValue(true)) {
@@ -166,6 +184,21 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
     if (_selectedImageFile == null) {
       _showSnackBar('Lütfen en az bir fotoğraf yükleyin');
       return;
+    }
+
+    // Process parametreleri kontrolü
+    for (var entry in _selectedProcesses.entries) {
+      if (entry.value) {
+        final controllers = _processControllers[entry.key]!;
+        if (controllers['power']!.text.isEmpty ||
+            controllers['speed']!.text.isEmpty ||
+            controllers['passes']!.text.isEmpty) {
+          _showSnackBar(
+            '⚠️ ${_getProcessName(entry.key)} için tüm parametreleri girin',
+          );
+          return;
+        }
+      }
     }
 
     setState(() => _isLoading = true);
@@ -189,10 +222,12 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
       ExperimentModel experiment = ExperimentModel(
         id: '',
         userId: widget.userId,
-        machineBrand: _machineBrandController.text,
-        laserPower: double.parse(_laserPowerController.text),
-        materialType: _materialTypeController.text,
-        materialThickness: double.parse(_thicknessController.text),
+        machineBrand: _selectedMachine!, // ✅ Dropdown'dan
+        laserPower: _selectedPower!, // ✅ Chip'den
+        materialType: AppConfig.getMaterialDisplayName(
+          _selectedMaterial!,
+        ), // ✅ Display name
+        materialThickness: _selectedThickness!, // ✅ Chip'den
         processes: processes,
         photoUrl: '',
         photoUrl2: '',
@@ -207,20 +242,16 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
         _selectedImageFile!,
         imageFile2: _selectedImageFile2,
       );
-      _showSnackBar('Gold Standard veri başarıyla eklendi!');
+      _showSnackBar('✅ Gold Standard veri başarıyla eklendi!');
       _clearForm();
     } catch (e) {
-      _showSnackBar('Hata: ${e.toString()}');
+      _showSnackBar('❌ Hata: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _clearForm() {
-    _machineBrandController.clear();
-    _laserPowerController.clear();
-    _materialTypeController.clear();
-    _thicknessController.clear();
     _processControllers.values.forEach(
       (c) => c.values.forEach((ctrl) {
         if (ctrl == c['passes'])
@@ -230,6 +261,10 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
       }),
     );
     setState(() {
+      _selectedMachine = null;
+      _selectedPower = null;
+      _selectedMaterial = null;
+      _selectedThickness = null;
       _selectedProcesses.updateAll((key, value) => false);
       _qualityScores.updateAll((key, value) => 5);
       _selectedImageFile = null;
@@ -243,6 +278,19 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
+  }
+
+  String _getProcessName(String key) {
+    switch (key) {
+      case 'cutting':
+        return 'Kesme';
+      case 'engraving':
+        return 'Kazıma';
+      case 'scoring':
+        return 'Çizme';
+      default:
+        return key;
+    }
   }
 
   @override
@@ -277,60 +325,12 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
               ),
               const SizedBox(height: 24),
 
-              // Makine bilgileri
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Makine Bilgileri',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _machineBrandController,
-                        label: 'Makine Marka/Model',
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _laserPowerController,
-                        label: 'Lazer Gücü (W)',
-                        keyboardType: TextInputType.number,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              // ✅ Makine seçimi (AppConfig entegrasyonu)
+              _buildMachineSection(isDark),
               const SizedBox(height: 16),
 
-              // Malzeme bilgileri
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Malzeme Bilgileri',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _materialTypeController,
-                        label: 'Malzeme Türü',
-                      ),
-                      const SizedBox(height: 16),
-                      CustomTextField(
-                        controller: _thicknessController,
-                        label: 'Kalınlık (mm)',
-                        keyboardType: TextInputType.number,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              // ✅ Malzeme seçimi (AppConfig entegrasyonu)
+              _buildMaterialSection(isDark),
               const SizedBox(height: 16),
 
               // İşlem tipleri
@@ -340,9 +340,15 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'İşlem Tipleri',
-                        style: Theme.of(context).textTheme.titleLarge,
+                      Row(
+                        children: [
+                          Icon(Icons.settings, color: Colors.purple),
+                          const SizedBox(width: 8),
+                          Text(
+                            'İşlem Tipleri',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 16),
                       ..._buildProcessSelections(),
@@ -424,6 +430,441 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
     );
   }
 
+  // ========== MAKINE SEÇİMİ (AppConfig) ==========
+  Widget _buildMachineSection(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.precision_manufacturing, color: Colors.green),
+                const SizedBox(width: 8),
+                Text(
+                  'Makine Bilgileri',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Makine Modeli',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children:
+                  AppConfig.SUPPORTED_MACHINES.map((machine) {
+                    final machineName = machine['name'] as String;
+                    final isSelected = _selectedMachine == machineName;
+                    return FilterChip(
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(machine['icon'] as String),
+                          const SizedBox(width: 4),
+                          Text(machineName),
+                        ],
+                      ),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedMachine = selected ? machineName : null;
+                          if (selected) {
+                            _selectedPower = machine['defaultPower'] as double;
+                          }
+                        });
+                      },
+                      selectedColor: Colors.green,
+                      labelStyle: TextStyle(
+                        color: isSelected ? Colors.white : Colors.black87,
+                        fontWeight:
+                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        fontSize: 13,
+                      ),
+                    );
+                  }).toList(),
+            ),
+
+            if (_selectedMachine != null) ...[
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 16),
+              Text(
+                'Lazer Gücü',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    AppConfig.getPowerRangeForMachine(_selectedMachine!).map((
+                      power,
+                    ) {
+                      final isSelected = _selectedPower == power;
+                      return ChoiceChip(
+                        label: Text('${power.toInt()}W'),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          setState(
+                            () => _selectedPower = selected ? power : null,
+                          );
+                        },
+                        selectedColor: Colors.blue,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : Colors.black87,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      );
+                    }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ========== MALZEME SEÇİMİ (AppConfig) ==========
+  Widget _buildMaterialSection(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.category, color: Colors.orange),
+                const SizedBox(width: 8),
+                Text(
+                  'Malzeme Bilgileri',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Malzeme kategorileri
+            ...AppConfig.MATERIAL_CATEGORIES.entries.map((category) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      category.key,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children:
+                        category.value.map((material) {
+                          final materialKey = material['key'] as String;
+                          final isSelected = _selectedMaterial == materialKey;
+                          final hasWarning = material['warning'] != null;
+                          return FilterChip(
+                            label: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(material['icon'] as String),
+                                const SizedBox(width: 4),
+                                Text(material['name'] as String),
+                                if (hasWarning) ...[
+                                  const SizedBox(width: 4),
+                                  Icon(
+                                    Icons.warning_amber,
+                                    size: 14,
+                                    color:
+                                        isSelected
+                                            ? Colors.white
+                                            : Colors.orange,
+                                  ),
+                                ],
+                              ],
+                            ),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                _selectedMaterial =
+                                    selected ? materialKey : null;
+                                if (selected) {
+                                  final maxThickness =
+                                      AppConfig.getMaxThicknessForMaterial(
+                                        materialKey,
+                                      );
+                                  if (_selectedThickness != null &&
+                                      _selectedThickness! > maxThickness) {
+                                    _selectedThickness = null;
+                                  }
+                                }
+                              });
+                            },
+                            selectedColor: Colors.orange,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black87,
+                              fontWeight:
+                                  isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                              fontSize: 12,
+                            ),
+                          );
+                        }).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              );
+            }).toList(),
+
+            if (_selectedMaterial != null) ...[
+              const Divider(),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Text(
+                    'Kalınlık (mm)',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Max: ${AppConfig.getMaxThicknessForMaterial(_selectedMaterial!).toInt()}mm',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.orange.shade900,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children:
+                    AppConfig.THICKNESS_VALUES
+                        .where(
+                          (t) =>
+                              t <=
+                              AppConfig.getMaxThicknessForMaterial(
+                                _selectedMaterial!,
+                              ),
+                        )
+                        .map((thickness) {
+                          final isSelected = _selectedThickness == thickness;
+                          return ChoiceChip(
+                            label: Text('$thickness mm'),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(
+                                () =>
+                                    _selectedThickness =
+                                        selected ? thickness : null,
+                              );
+                            },
+                            selectedColor: Colors.blue,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : Colors.black87,
+                              fontWeight:
+                                  isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                            ),
+                          );
+                        })
+                        .toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ========== İŞLEM PARAMETRELERİ ==========
+  List<Widget> _buildProcessSelections() {
+    List<Widget> widgets = [];
+    _selectedProcesses.forEach((processType, isSelected) {
+      String processName = _getProcessName(processType);
+      IconData icon =
+          processType == 'cutting'
+              ? Icons.content_cut
+              : processType == 'engraving'
+              ? Icons.draw
+              : Icons.border_style;
+      Color color =
+          processType == 'cutting'
+              ? Colors.red
+              : processType == 'engraving'
+              ? Colors.blue
+              : Colors.orange;
+
+      widgets.add(
+        Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? color : Colors.grey.shade300,
+            ),
+          ),
+          child: Column(
+            children: [
+              CheckboxListTile(
+                title: Row(
+                  children: [
+                    Icon(icon, size: 20, color: color),
+                    const SizedBox(width: 8),
+                    Text(
+                      processName,
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                value: isSelected,
+                onChanged:
+                    (v) => setState(
+                      () => _selectedProcesses[processType] = v ?? false,
+                    ),
+                activeColor: color,
+              ),
+              if (isSelected)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller:
+                                  _processControllers[processType]!['power']!,
+                              decoration: InputDecoration(
+                                labelText: 'Güç (%)',
+                                hintText: '0-100',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller:
+                                  _processControllers[processType]!['speed']!,
+                              decoration: InputDecoration(
+                                labelText: 'Hız (mm/s)',
+                                hintText: '50-500',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller:
+                                  _processControllers[processType]!['passes']!,
+                              decoration: InputDecoration(
+                                labelText: 'Geçiş',
+                                hintText: '1-20',
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Text(
+                            'Kalite: ${_qualityScores[processType]!.toInt()}/10',
+                          ),
+                          Expanded(
+                            child: Slider(
+                              value: _qualityScores[processType]!,
+                              min: 0,
+                              max: 10,
+                              divisions: 10,
+                              label:
+                                  _qualityScores[processType]!
+                                      .toInt()
+                                      .toString(),
+                              onChanged:
+                                  (value) => setState(
+                                    () => _qualityScores[processType] = value,
+                                  ),
+                              activeColor: color,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    });
+    return widgets;
+  }
+
+  // ========== FOTOĞRAF YÜKLENMESİ ==========
   Widget _buildPhotoSection({
     required String title,
     required XFile? imageFile,
@@ -569,91 +1010,8 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
     );
   }
 
-  List<Widget> _buildProcessSelections() {
-    List<Widget> widgets = [];
-    _selectedProcesses.forEach((processType, isSelected) {
-      String processName =
-          processType == 'cutting'
-              ? 'Kesme'
-              : processType == 'engraving'
-              ? 'Kazıma'
-              : 'Çizme';
-      widgets.add(
-        CheckboxListTile(
-          title: Text(processName),
-          value: isSelected,
-          onChanged:
-              (v) =>
-                  setState(() => _selectedProcesses[processType] = v ?? false),
-        ),
-      );
-      if (isSelected) {
-        final controllers = _processControllers[processType]!;
-        widgets.add(
-          Padding(
-            padding: const EdgeInsets.only(left: 32, right: 16, bottom: 16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: CustomTextField(
-                        controller: controllers['power']!,
-                        label: 'Güç (%)',
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: CustomTextField(
-                        controller: controllers['speed']!,
-                        label: 'Hız (mm/s)',
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: CustomTextField(
-                        controller: controllers['passes']!,
-                        label: 'Geçiş',
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Text('Kalite: ${_qualityScores[processType]!.toInt()}/10'),
-                    Expanded(
-                      child: Slider(
-                        value: _qualityScores[processType]!,
-                        min: 0,
-                        max: 10,
-                        divisions: 10,
-                        label: _qualityScores[processType]!.toInt().toString(),
-                        onChanged:
-                            (v) =>
-                                setState(() => _qualityScores[processType] = v),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      }
-    });
-    return widgets;
-  }
-
   @override
   void dispose() {
-    _machineBrandController.dispose();
-    _laserPowerController.dispose();
-    _materialTypeController.dispose();
-    _thicknessController.dispose();
     _processControllers.values.forEach(
       (c) => c.values.forEach((ctrl) => ctrl.dispose()),
     );
