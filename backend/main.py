@@ -274,9 +274,9 @@ async def predict(request: PredictionRequest):
         notes = ""
         
         # ===== TRY TRANSFER LEARNING FIRST =====
-        if transfer_model and TF_AVAILABLE and feature_encoder:
+        if transfer_model and TF_AVAILABLE and feature_encoder and transfer_model.is_trained:
             try:
-                logger.info("🤖 Using transfer learning model...")
+                logger.info("🤖 Using trained transfer learning model...")
                 
                 for process_type in request.processes:
                     # Encode features (9 numerical features)
@@ -314,12 +314,18 @@ async def predict(request: PredictionRequest):
                 notes = "🤖 Transfer learning model (Firebase data ile eğitildi)"
                 
             except Exception as e:
-                logger.warning(f"⚠️ Transfer learning failed: {e}")
+                logger.warning(f"⚠️ Transfer learning prediction failed: {e}")
                 predictions = {}
+        elif transfer_model and not transfer_model.is_trained:
+            logger.info("ℹ️ Model exists but UNTRAINED, using static algorithm")
+            predictions = {}
         
         # ===== FALLBACK: STATIC ALGORITHM =====
         if not predictions:
-            logger.info("⚙️ Using static algorithm fallback")
+            if transfer_model and not transfer_model.is_trained:
+                logger.info("⚙️ Using static algorithm (model exists but untrained)")
+            else:
+                logger.info("⚙️ Using static algorithm fallback")
             
             for process_type in request.processes:
                 if process_type == 'cutting':
@@ -341,7 +347,11 @@ async def predict(request: PredictionRequest):
             
             data_source = "static_algorithm"
             confidence_score = 0.60
-            notes = "⚙️ Statik algoritma (TL model yok veya başarısız)"
+            
+            if transfer_model and not transfer_model.is_trained:
+                notes = "⚙️ Statik algoritma (Model mimarisi hazır, veri bekliyor - 50+ doğrulanmış deney gerekli)"
+            else:
+                notes = "⚙️ Statik algoritma (TL model yok veya başarısız)"
         
         response = PredictionResponse(
             predictions=predictions,
@@ -535,7 +545,7 @@ async def startup_event():
                 if storage_service.load_model_from_storage(local_model_path):
                     transfer_model = get_transfer_model(local_model_path)
                     model_loaded = True
-                    logger.info("✅ Model loaded from Firebase Storage")
+                    logger.info("✅ Model loaded from Firebase Storage (TRAINED)")
                     
                     # Log metadata
                     metadata = storage_service.get_model_metadata()
@@ -550,13 +560,14 @@ async def startup_event():
                 logger.info(f"📂 Loading model from local: {local_model_path}")
                 transfer_model = get_transfer_model(local_model_path)
                 model_loaded = True
-                logger.info("✅ Model loaded from local file")
+                logger.info("✅ Model loaded from local file (TRAINED)")
             
-            # ===== STEP 3: Create new model =====
+            # ===== STEP 3: ALWAYS create model architecture =====
             if not model_loaded:
-                logger.info("🆕 No existing model found, creating new...")
+                logger.info("🆕 No existing model found, creating new architecture...")
                 transfer_model = get_transfer_model()
-                logger.info("✅ New model architecture created")
+                logger.info("✅ Model architecture created (UNTRAINED)")
+                logger.info("   ℹ️ Model will use random weights until trained with data")
             
             # ===== STEP 4: Train/Fine-tune if enough data =====
             should_save_to_storage = False
@@ -566,7 +577,8 @@ async def startup_event():
                 verified_count = stats.get('verified_experiments', 0)
                 
                 if verified_count >= 50:
-                    logger.info(f"📄 Training with {verified_count} experiments...")
+                    logger.info(f"📄 Sufficient data available: {verified_count} verified experiments")
+                    logger.info("   🔄 Starting training/fine-tuning process...")
                     
                     try:
                         training_data = firebase.get_training_data_for_transfer_learning(limit=500)
@@ -592,12 +604,20 @@ async def startup_event():
                             
                             should_save_to_storage = True
                         else:
-                            logger.warning(f"⚠️ Only {len(training_data)} samples, need 30+")
+                            logger.warning(f"⚠️ Only {len(training_data)} training samples, need 30+")
+                            logger.info("   ℹ️ Model will use static algorithm until more data available")
                     except Exception as e:
                         logger.error(f"❌ Training failed: {e}")
                         logger.exception("Full error:")
+                        logger.info("   ℹ️ Model will use static algorithm as fallback")
                 else:
-                    logger.warning(f"⚠️ Only {verified_count} verified experiments, need 50+")
+                    logger.warning(f"⚠️ Insufficient data: {verified_count} verified experiments (need 50+)")
+                    logger.info("   ℹ️ Model architecture ready but UNTRAINED")
+                    logger.info("   ℹ️ Predictions will use static algorithm until more data available")
+            else:
+                if not firebase.is_available():
+                    logger.warning("⚠️ Firebase not available, cannot train model")
+                logger.info("   ℹ️ Model will use static algorithm")
             
             # ===== STEP 5: Upload to Firebase Storage =====
             if should_save_to_storage and storage_service.is_available():
