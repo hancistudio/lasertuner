@@ -176,6 +176,24 @@ class MaterialFeatureEncoder:
             'melt': 0.0,
             'absorb': 0.86,
         },
+        'ladin': {
+            'density': 0.45,
+            'thermal': 0.11,
+            'melt': 0.0,
+            'absorb': 0.87,
+        },
+        'spruce': {
+            'density': 0.45,
+            'thermal': 0.11,
+            'melt': 0.0,
+            'absorb': 0.87,
+        },
+        'fir': {
+            'density': 0.45,
+            'thermal': 0.11,
+            'melt': 0.0,
+            'absorb': 0.87,
+        },
         
         # ===== ORGANİK MALZEMELER =====
         'deri': {
@@ -277,6 +295,24 @@ class MaterialFeatureEncoder:
             'absorb': 0.65,
         },
         'acrylic': {
+            'density': 1.18,
+            'thermal': 0.19,
+            'melt': 0.42,
+            'absorb': 0.65,
+        },
+        'plexiglass': {
+            'density': 1.18,
+            'thermal': 0.19,
+            'melt': 0.42,
+            'absorb': 0.65,
+        },
+        'pleksiglas': {
+            'density': 1.18,
+            'thermal': 0.19,
+            'melt': 0.42,
+            'absorb': 0.65,
+        },
+        'pmma': {
             'density': 1.18,
             'thermal': 0.19,
             'melt': 0.42,

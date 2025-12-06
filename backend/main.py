@@ -96,9 +96,10 @@ class PredictionRequest(BaseModel):
             'ahşap', 'ahsap', 'wood', 'kontrplak', 'plywood', 'mdf', 'balsa',
             'bambu', 'bamboo', 'kayın', 'kayin', 'beech', 'meşe', 'mese', 'oak',
             'ceviz', 'walnut', 'akçaağaç', 'akcaagac', 'maple', 'huş', 'hus', 
-            'birch', 'çam', 'cam', 'pine', 'deri', 'leather', 'karton', 
-            'cardboard', 'kağıt', 'kagit', 'paper', 'kumaş', 'kumas', 'fabric',
-            'keçe', 'kece', 'felt', 'mantar', 'cork', 'akrilik', 'acrylic',
+            'birch', 'çam', 'cam', 'pine', 'ladin', 'spruce', 'fir',
+            'deri', 'leather', 'karton', 'cardboard', 'kağıt', 'kagit', 'paper', 
+            'kumaş', 'kumas', 'fabric', 'keçe', 'kece', 'felt', 'mantar', 'cork', 
+            'akrilik', 'acrylic', 'plexiglass', 'pleksiglas', 'pmma',
             'lastik', 'rubber', 'köpük', 'kopuk', 'foam', 'anodize_aluminyum',
             'anodized_aluminum', 'diger', 'other'
         }
@@ -145,6 +146,7 @@ def get_diode_material_params(material: str) -> Dict:
     material = material.lower().strip()
     
     params = {
+        # WOOD MATERIALS
         'ahşap': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
         'ahsap': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
         'wood': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
@@ -154,10 +156,20 @@ def get_diode_material_params(material: str) -> Dict:
         'balsa': {'base_power': 60, 'power_mult': 2.5, 'base_speed': 380, 'speed_mult': 20, 'base_passes': 1, 'passes_mult': 0.3},
         'bambu': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
         'bamboo': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
+        'ladin': {'base_power': 75, 'power_mult': 3.5, 'base_speed': 320, 'speed_mult': 28, 'base_passes': 2, 'passes_mult': 0.4},
+        'spruce': {'base_power': 75, 'power_mult': 3.5, 'base_speed': 320, 'speed_mult': 28, 'base_passes': 2, 'passes_mult': 0.4},
+        'fir': {'base_power': 75, 'power_mult': 3.5, 'base_speed': 320, 'speed_mult': 28, 'base_passes': 2, 'passes_mult': 0.4},
+        
+        # ORGANIC MATERIALS
         'deri': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 350, 'speed_mult': 28, 'base_passes': 1, 'passes_mult': 0.4},
         'leather': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 350, 'speed_mult': 28, 'base_passes': 1, 'passes_mult': 0.4},
+        
+        # SYNTHETIC MATERIALS
         'akrilik': {'base_power': 75, 'power_mult': 4.0, 'base_speed': 280, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
         'acrylic': {'base_power': 75, 'power_mult': 4.0, 'base_speed': 280, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
+        'plexiglass': {'base_power': 75, 'power_mult': 4.0, 'base_speed': 280, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
+        'pleksiglas': {'base_power': 75, 'power_mult': 4.0, 'base_speed': 280, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
+        'pmma': {'base_power': 75, 'power_mult': 4.0, 'base_speed': 280, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
     }
     
     if material in params:
