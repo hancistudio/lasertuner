@@ -3,8 +3,15 @@
 LaserTuner ML API v3.0 - DIODE LASER EDITION
 Backend API for Diode Laser Machines (2W-40W)
 AppConfig Compatible - Updated Material System
+Firebase Storage Integration for Model Persistence
 """
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
 from online_learning_service import get_online_learner 
+from ml_feature_engineering import get_feature_encoder
+from ml_transfer_model import get_transfer_model, TF_AVAILABLE
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,12 +19,13 @@ from pydantic import BaseModel, Field, validator
 from typing import List, Dict, Optional
 import logging
 import os
+import numpy as np
 from datetime import datetime
 from dotenv import load_dotenv
 
 # Import our services
 from firebase_service import get_firebase_service
-from ml_prediction import get_ml_service
+from model_storage_service import get_storage_service
 
 # Load environment variables
 load_dotenv()
@@ -29,6 +37,10 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger(__name__)
+
+# ✅ GLOBAL VARIABLES for Transfer Learning
+transfer_model = None
+feature_encoder = None
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -80,57 +92,28 @@ class PredictionRequest(BaseModel):
     
     @validator('materialType')
     def validate_material(cls, v):
-        """✅ AppConfig uyumlu malzeme validasyonu - esnek yaklaşım"""
-        # Desteklenen tüm malzemeler (AppConfig'den)
+        """✅ AppConfig uyumlu malzeme validasyonu"""
         valid_materials = {
-            # Ahşap Ürünleri
-            'ahşap', 'ahsap', 'wood',
-            'kontrplak', 'plywood',
-            'mdf',
-            'balsa',
-            'bambu', 'bamboo',
-            'kayın', 'kayin', 'beech',
-            'meşe', 'mese', 'oak',
-            'ceviz', 'walnut',
-            'akçaağaç', 'akcaagac', 'maple',
-            'huş', 'hus', 'birch',
-            'çam', 'cam', 'pine',
-            
-            # Organik Malzemeler
-            'deri', 'leather',
-            'karton', 'cardboard',
-            'kağıt', 'kagit', 'paper',
-            'kumaş', 'kumas', 'fabric',
-            'keçe', 'kece', 'felt',
-            'mantar', 'cork',
-            
-            # Sentetik Malzemeler
-            'akrilik', 'acrylic',
-            'lastik', 'rubber',
-            'köpük', 'kopuk', 'foam',
-            
-            # Metal (Sınırlı - sadece markalama)
-            'anodize_aluminyum', 'anodized_aluminum',
-            
-            # Diğer
-            'diger', 'other'
+            'ahşap', 'ahsap', 'wood', 'kontrplak', 'plywood', 'mdf', 'balsa',
+            'bambu', 'bamboo', 'kayın', 'kayin', 'beech', 'meşe', 'mese', 'oak',
+            'ceviz', 'walnut', 'akçaağaç', 'akcaagac', 'maple', 'huş', 'hus', 
+            'birch', 'çam', 'cam', 'pine', 'deri', 'leather', 'karton', 
+            'cardboard', 'kağıt', 'kagit', 'paper', 'kumaş', 'kumas', 'fabric',
+            'keçe', 'kece', 'felt', 'mantar', 'cork', 'akrilik', 'acrylic',
+            'lastik', 'rubber', 'köpük', 'kopuk', 'foam', 'anodize_aluminyum',
+            'anodized_aluminum', 'diger', 'other'
         }
         
-        # Normalize
         v_lower = v.lower().strip()
-        
-        # Exact match
         if v_lower in valid_materials:
             return v
         
-        # Partial match (esnek kontrol - kullanıcı "Ahşap (Wood)" gibi gönderebilir)
         for valid in valid_materials:
             if valid in v_lower or v_lower in valid:
                 logger.info(f"✅ Material matched: '{v}' → '{valid}'")
                 return v
         
-        # Uyarı ver ama reddetme (Firebase'de farklı yazılmış olabilir)
-        logger.warning(f"⚠️ Unknown material: {v}, but allowing for flexibility")
+        logger.warning(f"⚠️ Unknown material: {v}, allowing for flexibility")
         return v
 
 
@@ -156,160 +139,73 @@ class HealthResponse(BaseModel):
     total_experiments: int = 0
 
 
-# ============= DIODE LASER PARAMETERS - AppConfig Compatible =============
+# ============= DIODE LASER PARAMETERS =============
 
 def get_diode_material_params(material: str) -> Dict:
-    """
-    ✅ AppConfig uyumlu malzeme parametreleri
-    Get base parameters for diode laser materials
-    """
+    """Get base parameters for diode laser materials"""
     material = material.lower().strip()
     
-    # Format: {base_power_%, power_per_mm, base_speed, speed_per_mm, base_passes, passes_per_mm}
     params = {
-        # ===== AHŞAP ÜRÜNLERİ =====
         'ahşap': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
         'ahsap': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
         'wood': {'base_power': 80, 'power_mult': 4.0, 'base_speed': 300, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
-        
         'kontrplak': {'base_power': 82, 'power_mult': 4.2, 'base_speed': 290, 'speed_mult': 32, 'base_passes': 2, 'passes_mult': 0.5},
         'plywood': {'base_power': 82, 'power_mult': 4.2, 'base_speed': 290, 'speed_mult': 32, 'base_passes': 2, 'passes_mult': 0.5},
-        
         'mdf': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
-        
         'balsa': {'base_power': 60, 'power_mult': 2.5, 'base_speed': 380, 'speed_mult': 20, 'base_passes': 1, 'passes_mult': 0.3},
-        
         'bambu': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
         'bamboo': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
-        
-        'kayın': {'base_power': 88, 'power_mult': 5.0, 'base_speed': 260, 'speed_mult': 38, 'base_passes': 3, 'passes_mult': 0.7},
-        'kayin': {'base_power': 88, 'power_mult': 5.0, 'base_speed': 260, 'speed_mult': 38, 'base_passes': 3, 'passes_mult': 0.7},
-        'beech': {'base_power': 88, 'power_mult': 5.0, 'base_speed': 260, 'speed_mult': 38, 'base_passes': 3, 'passes_mult': 0.7},
-        
-        'meşe': {'base_power': 90, 'power_mult': 5.5, 'base_speed': 250, 'speed_mult': 40, 'base_passes': 3, 'passes_mult': 0.8},
-        'mese': {'base_power': 90, 'power_mult': 5.5, 'base_speed': 250, 'speed_mult': 40, 'base_passes': 3, 'passes_mult': 0.8},
-        'oak': {'base_power': 90, 'power_mult': 5.5, 'base_speed': 250, 'speed_mult': 40, 'base_passes': 3, 'passes_mult': 0.8},
-        
-        'ceviz': {'base_power': 87, 'power_mult': 5.0, 'base_speed': 270, 'speed_mult': 38, 'base_passes': 3, 'passes_mult': 0.7},
-        'walnut': {'base_power': 87, 'power_mult': 5.0, 'base_speed': 270, 'speed_mult': 38, 'base_passes': 3, 'passes_mult': 0.7},
-        
-        'akçaağaç': {'base_power': 88, 'power_mult': 5.2, 'base_speed': 265, 'speed_mult': 39, 'base_passes': 3, 'passes_mult': 0.7},
-        'akcaagac': {'base_power': 88, 'power_mult': 5.2, 'base_speed': 265, 'speed_mult': 39, 'base_passes': 3, 'passes_mult': 0.7},
-        'maple': {'base_power': 88, 'power_mult': 5.2, 'base_speed': 265, 'speed_mult': 39, 'base_passes': 3, 'passes_mult': 0.7},
-        
-        'huş': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
-        'hus': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
-        'birch': {'base_power': 85, 'power_mult': 4.5, 'base_speed': 280, 'speed_mult': 35, 'base_passes': 2, 'passes_mult': 0.6},
-        
-        'çam': {'base_power': 78, 'power_mult': 3.8, 'base_speed': 310, 'speed_mult': 28, 'base_passes': 2, 'passes_mult': 0.5},
-        'cam': {'base_power': 78, 'power_mult': 3.8, 'base_speed': 310, 'speed_mult': 28, 'base_passes': 2, 'passes_mult': 0.5},
-        'pine': {'base_power': 78, 'power_mult': 3.8, 'base_speed': 310, 'speed_mult': 28, 'base_passes': 2, 'passes_mult': 0.5},
-        
-        # ===== ORGANİK MALZEMELER =====
-        'karton': {'base_power': 50, 'power_mult': 3.0, 'base_speed': 400, 'speed_mult': 25, 'base_passes': 1, 'passes_mult': 0.3},
-        'cardboard': {'base_power': 50, 'power_mult': 3.0, 'base_speed': 400, 'speed_mult': 25, 'base_passes': 1, 'passes_mult': 0.3},
-        
         'deri': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 350, 'speed_mult': 28, 'base_passes': 1, 'passes_mult': 0.4},
         'leather': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 350, 'speed_mult': 28, 'base_passes': 1, 'passes_mult': 0.4},
-        
-        'keçe': {'base_power': 60, 'power_mult': 2.5, 'base_speed': 380, 'speed_mult': 20, 'base_passes': 1, 'passes_mult': 0.2},
-        'kece': {'base_power': 60, 'power_mult': 2.5, 'base_speed': 380, 'speed_mult': 20, 'base_passes': 1, 'passes_mult': 0.2},
-        'felt': {'base_power': 60, 'power_mult': 2.5, 'base_speed': 380, 'speed_mult': 20, 'base_passes': 1, 'passes_mult': 0.2},
-        
-        'kumaş': {'base_power': 45, 'power_mult': 2.0, 'base_speed': 420, 'speed_mult': 15, 'base_passes': 1, 'passes_mult': 0.1},
-        'kumas': {'base_power': 45, 'power_mult': 2.0, 'base_speed': 420, 'speed_mult': 15, 'base_passes': 1, 'passes_mult': 0.1},
-        'fabric': {'base_power': 45, 'power_mult': 2.0, 'base_speed': 420, 'speed_mult': 15, 'base_passes': 1, 'passes_mult': 0.1},
-        
-        'kağıt': {'base_power': 40, 'power_mult': 1.5, 'base_speed': 450, 'speed_mult': 10, 'base_passes': 1, 'passes_mult': 0.1},
-        'kagit': {'base_power': 40, 'power_mult': 1.5, 'base_speed': 450, 'speed_mult': 10, 'base_passes': 1, 'passes_mult': 0.1},
-        'paper': {'base_power': 40, 'power_mult': 1.5, 'base_speed': 450, 'speed_mult': 10, 'base_passes': 1, 'passes_mult': 0.1},
-        
-        'köpük': {'base_power': 55, 'power_mult': 2.0, 'base_speed': 400, 'speed_mult': 18, 'base_passes': 1, 'passes_mult': 0.2},
-        'kopuk': {'base_power': 55, 'power_mult': 2.0, 'base_speed': 400, 'speed_mult': 18, 'base_passes': 1, 'passes_mult': 0.2},
-        'foam': {'base_power': 55, 'power_mult': 2.0, 'base_speed': 400, 'speed_mult': 18, 'base_passes': 1, 'passes_mult': 0.2},
-        
-        'mantar': {'base_power': 65, 'power_mult': 3.0, 'base_speed': 360, 'speed_mult': 22, 'base_passes': 1, 'passes_mult': 0.3},
-        'cork': {'base_power': 65, 'power_mult': 3.0, 'base_speed': 360, 'speed_mult': 22, 'base_passes': 1, 'passes_mult': 0.3},
-        
-        # ===== SENTETİK MALZEMELER =====
         'akrilik': {'base_power': 75, 'power_mult': 4.0, 'base_speed': 280, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
         'acrylic': {'base_power': 75, 'power_mult': 4.0, 'base_speed': 280, 'speed_mult': 30, 'base_passes': 2, 'passes_mult': 0.5},
-        
-        'lastik': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 320, 'speed_mult': 25, 'base_passes': 1, 'passes_mult': 0.4},
-        'rubber': {'base_power': 70, 'power_mult': 3.5, 'base_speed': 320, 'speed_mult': 25, 'base_passes': 1, 'passes_mult': 0.4},
-        
-        # ===== METAL (Sınırlı) =====
-        'anodize_aluminyum': {'base_power': 95, 'power_mult': 8.0, 'base_speed': 150, 'speed_mult': 50, 'base_passes': 5, 'passes_mult': 1.5},
-        'anodized_aluminum': {'base_power': 95, 'power_mult': 8.0, 'base_speed': 150, 'speed_mult': 50, 'base_passes': 5, 'passes_mult': 1.5},
     }
     
-    # Try exact match first
     if material in params:
         return params[material]
     
-    # Try partial match (esnek - "Ahşap (Wood)" → "ahsap")
     for key in params.keys():
         if key in material or material in key:
             logger.info(f"✅ Material param matched: '{material}' → '{key}'")
             return params[key]
     
-    # Default values (bilinmeyen malzemeler için)
     logger.warning(f"⚠️ Using default params for material: {material}")
-    return {
-        'base_power': 75, 'power_mult': 3.5, 'base_speed': 320, 
-        'speed_mult': 25, 'base_passes': 2, 'passes_mult': 0.4
-    }
+    return {'base_power': 75, 'power_mult': 3.5, 'base_speed': 320, 
+            'speed_mult': 25, 'base_passes': 2, 'passes_mult': 0.4}
 
 
 def calculate_diode_cutting_params(material: str, thickness: float) -> ProcessParams:
     """Calculate cutting parameters for diode laser"""
     params = get_diode_material_params(material)
-    
-    # Calculate power (percentage)
     power = params['base_power'] + (thickness * params['power_mult'])
     power = round(max(10, min(100, power)), 1)
-    
-    # Calculate speed (mm/min)
     speed = params['base_speed'] - (thickness * params['speed_mult'])
     speed = round(max(50, min(500, speed)), 0)
-    
-    # Calculate passes
     passes = params['base_passes'] + int(thickness * params['passes_mult'])
     passes = max(1, min(20, passes))
-    
     return ProcessParams(power=power, speed=speed, passes=passes)
 
 
 def calculate_diode_engraving_params(material: str, thickness: float) -> ProcessParams:
-    """Calculate engraving parameters for diode laser"""
+    """Calculate engraving parameters"""
     params = get_diode_material_params(material)
-    
-    # Engraving uses lower power and faster speed
     power = (params['base_power'] * 0.5) + (thickness * 1.5)
     power = round(max(10, min(100, power)), 1)
-    
-    speed = params['base_speed'] + 100  # Faster for engraving
+    speed = params['base_speed'] + 100
     speed = round(max(100, min(500, speed)), 0)
-    
-    passes = 1  # Usually single pass for engraving
-    
+    passes = 1
     return ProcessParams(power=power, speed=speed, passes=passes)
 
 
 def calculate_diode_scoring_params(material: str, thickness: float) -> ProcessParams:
-    """Calculate scoring parameters for diode laser"""
+    """Calculate scoring parameters"""
     params = get_diode_material_params(material)
-    
-    # Scoring is between engraving and cutting
     power = (params['base_power'] * 0.7) + (thickness * 2.5)
     power = round(max(10, min(100, power)), 1)
-    
     speed = params['base_speed'] + 50
     speed = round(max(80, min(500, speed)), 0)
-    
     passes = max(1, int(thickness * 0.3))
     passes = max(1, min(10, passes))
-    
     return ProcessParams(power=power, speed=speed, passes=passes)
 
 
@@ -320,7 +216,6 @@ async def root():
     """Root endpoint"""
     firebase = get_firebase_service()
     stats = firebase.get_statistics() if firebase.is_available() else {}
-    
     return HealthResponse(
         status="healthy",
         service="LaserTuner ML API - Diode Edition",
@@ -335,10 +230,9 @@ async def root():
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    """Health check with Firebase status"""
+    """Health check"""
     firebase = get_firebase_service()
     stats = firebase.get_statistics() if firebase.is_available() else {}
-    
     return HealthResponse(
         status="healthy",
         service="LaserTuner ML API - Diode Edition",
@@ -351,150 +245,115 @@ async def health_check():
     )
 
 
-@app.get("/statistics")
-async def get_statistics():
-    """Get database statistics"""
-    firebase = get_firebase_service()
-    
-    if not firebase.is_available():
-        return {
-            "status": "firebase_unavailable",
-            "message": "Firebase bağlantısı mevcut değil",
-            "using_fallback": True
-        }
-    
-    stats = firebase.get_statistics()
-    return stats
-
-
 @app.post("/predict", response_model=PredictionResponse)
 async def predict(request: PredictionRequest):
-    """Predict diode laser cutting parameters using REAL USER DATA"""
+    """
+    🤖 TRANSFER LEARNING PREDICTION ENDPOINT
+    
+    Flow:
+    1. Try transfer learning model (if trained)
+    2. Fallback to static algorithm if needed
+    """
     start_time = datetime.now()
     
     try:
         logger.info(
-            f"🔍 Diode Laser Prediction: {request.machineBrand} {request.laserPower}W, "
-            f"{request.materialType} {request.materialThickness}mm, "
-            f"processes: {request.processes}"
+            f"🔥 Prediction request: {request.machineBrand} {request.laserPower}W, "
+            f"{request.materialType} {request.materialThickness}mm, processes: {request.processes}"
         )
         
-        # Warnings for diode laser limitations
         warnings = []
-        
-        # Check thickness
         if request.materialThickness > 8:
-            warnings.append(
-                f"⚠️ {request.materialThickness}mm kalınlık diode lazer için zorlu olabilir. "
-                f"En iyi sonuç için 3-5mm önerilir."
-            )
-        
-        # Check power for thick materials
+            warnings.append(f"⚠️ {request.materialThickness}mm kalınlık zorlu olabilir")
         if request.materialThickness > 5 and request.laserPower < 20:
-            warnings.append(
-                f"⚠️ {request.laserPower}W güç {request.materialThickness}mm kesim için düşük olabilir. "
-                f"Daha fazla geçiş gerekebilir."
-            )
-        
-        # Get services
-        firebase = get_firebase_service()
-        ml_service = get_ml_service()
+            warnings.append(f"⚠️ {request.laserPower}W güç düşük olabilir")
         
         predictions = {}
-        total_data_points = 0
-        max_confidence = 0.0
-        all_notes = []
-        data_sources = set()
+        data_source = "static_algorithm"
+        confidence_score = 0.60
+        notes = ""
         
-        # Try to get similar experiments from Firebase
-        similar_experiments = []
-        if firebase.is_available():
-            similar_experiments = firebase.get_similar_experiments(
-                material_type=request.materialType,
-                thickness=request.materialThickness,
-                thickness_tolerance=1.5  # Tighter tolerance for diode
-            )
-            logger.info(f"📊 Found {len(similar_experiments)} similar experiments")
-        
-        # Calculate parameters for each process
-        for process_type in request.processes:
-            if similar_experiments:
-                ml_result = ml_service.predict_from_data(
-                    experiments=similar_experiments,
-                    process_type=process_type,
-                    material_type=request.materialType,
-                    thickness=request.materialThickness,
-                    target_power=request.laserPower
-                )
+        # ===== TRY TRANSFER LEARNING FIRST =====
+        if transfer_model and TF_AVAILABLE and feature_encoder:
+            try:
+                logger.info("🤖 Using transfer learning model...")
                 
-                params_dict, confidence, notes = ml_result
-                
-                if params_dict:
-                    # Success! Using real data
-                    predictions[process_type] = ProcessParams(**params_dict)
-                    total_data_points = len(similar_experiments)
-                    max_confidence = max(max_confidence, confidence)
-                    all_notes.append(notes)
-                    data_sources.add("user_data")
-                    logger.info(
-                        f"✅ {process_type}: Using ML prediction (confidence: {confidence})"
+                for process_type in request.processes:
+                    # Encode features (9 numerical features)
+                    features = feature_encoder.encode(
+                        material_type=request.materialType,
+                        thickness=request.materialThickness,
+                        laser_power=request.laserPower,
+                        process_type=process_type
                     )
-                    continue
-            
-            # Fallback to diode-specific algorithm
-            logger.info(
-                f"⚠️ {process_type}: Insufficient data, using diode laser algorithm"
-            )
-            
-            if process_type == 'cutting':
-                params = calculate_diode_cutting_params(
-                    request.materialType, request.materialThickness
-                )
-            elif process_type == 'engraving':
-                params = calculate_diode_engraving_params(
-                    request.materialType, request.materialThickness
-                )
-            elif process_type == 'scoring':
-                params = calculate_diode_scoring_params(
-                    request.materialType, request.materialThickness
-                )
-            else:
-                params = ProcessParams(power=50.0, speed=300.0, passes=2)
-            
-            predictions[process_type] = params
-            data_sources.add("static_algorithm")
+                    
+                    # Predict (normalized 0-1 outputs)
+                    X = features.reshape(1, -1)
+                    power_norm, speed_norm, passes_norm = transfer_model.predict(X)
+                    
+                    # Denormalize predictions
+                    pred = feature_encoder.decode_predictions(
+                        power_norm[0][0],
+                        speed_norm[0][0],
+                        passes_norm[0][0]
+                    )
+                    
+                    predictions[process_type] = ProcessParams(
+                        power=float(pred['power']),
+                        speed=float(pred['speed']),
+                        passes=int(pred['passes'])
+                    )
+                    
+                    logger.info(
+                        f"✅ {process_type}: TL → power={pred['power']:.1f}%, "
+                        f"speed={pred['speed']:.0f}mm/min, passes={pred['passes']}"
+                    )
+                
+                data_source = "transfer_learning"
+                confidence_score = 0.85
+                notes = "🤖 Transfer learning model (Firebase data ile eğitildi)"
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Transfer learning failed: {e}")
+                predictions = {}
         
-        # Determine final confidence and notes
-        if total_data_points > 0:
-            confidence_score = max_confidence
-            final_notes = " | ".join(all_notes)
-            data_source = "hybrid" if "static_algorithm" in data_sources else "user_data"
-        else:
-            confidence_score = 0.55
-            final_notes = (
-                "⚠️ Yetersiz topluluk verisi, diode lazer algoritması kullanıldı. "
-                "Daha iyi sonuçlar için benzer deneyler ekleyin!"
-            )
+        # ===== FALLBACK: STATIC ALGORITHM =====
+        if not predictions:
+            logger.info("⚙️ Using static algorithm fallback")
+            
+            for process_type in request.processes:
+                if process_type == 'cutting':
+                    params = calculate_diode_cutting_params(
+                        request.materialType, request.materialThickness
+                    )
+                elif process_type == 'engraving':
+                    params = calculate_diode_engraving_params(
+                        request.materialType, request.materialThickness
+                    )
+                elif process_type == 'scoring':
+                    params = calculate_diode_scoring_params(
+                        request.materialType, request.materialThickness
+                    )
+                else:
+                    params = ProcessParams(power=50.0, speed=300.0, passes=2)
+                
+                predictions[process_type] = params
+            
             data_source = "static_algorithm"
+            confidence_score = 0.60
+            notes = "⚙️ Statik algoritma (TL model yok veya başarısız)"
         
-        # Create response
         response = PredictionResponse(
             predictions=predictions,
             confidenceScore=confidence_score,
-            notes=final_notes,
-            dataPointsUsed=total_data_points,
+            notes=notes,
+            dataPointsUsed=0,
             dataSource=data_source,
             warnings=warnings
         )
         
         duration = (datetime.now() - start_time).total_seconds()
-        logger.info(
-            f"✅ Prediction complete: {len(predictions)} processes, "
-            f"source: {data_source}, "
-            f"data_points: {total_data_points}, "
-            f"confidence: {confidence_score:.2f}, "
-            f"duration: {duration:.3f}s"
-        )
+        logger.info(f"✅ Prediction complete in {duration:.3f}s, source: {data_source}")
         
         return response
         
@@ -503,135 +362,279 @@ async def predict(request: PredictionRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception(f"❌ Unexpected error: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail="Tahmin sırasında bir hata oluştu."
-        )
+        raise HTTPException(status_code=500, detail="Tahmin hatası")
 
 
 @app.get("/test")
 async def test_endpoint():
-    """Test endpoint with Firebase status"""
+    """Test endpoint with Firebase Storage info"""
     firebase = get_firebase_service()
+    storage_service = get_storage_service()
     stats = firebase.get_statistics() if firebase.is_available() else {}
+    
+    model_info = {}
+    if storage_service.is_available():
+        model_metadata = storage_service.get_model_metadata()
+        if model_metadata:
+            model_info = {
+                'exists_in_storage': True,
+                'size_mb': round(model_metadata['size_mb'], 2),
+                'last_updated': str(model_metadata['updated']),
+            }
+        else:
+            model_info = {'exists_in_storage': False}
     
     return {
         "status": "ok",
         "version": "3.0.0-diode",
-        "laser_type": "Diode Laser",
-        "power_range": "2W - 40W",
-        "message": "Diode Laser API çalışıyor!",
-        "firebase_connected": firebase.is_available(),
+        "transfer_learning_enabled": TF_AVAILABLE and transfer_model is not None,
+        "transfer_learning_trained": transfer_model.is_trained if transfer_model else False,
+        "firebase_firestore_connected": firebase.is_available(),
+        "firebase_storage_connected": storage_service.is_available(),
+        "model_storage": model_info,
         "total_experiments": stats.get('total_experiments', 0),
         "verified_experiments": stats.get('verified_experiments', 0),
-        "supported_materials": [
-            "Ahşap Ürünleri (11 çeşit)", "Organik Malzemeler (6 çeşit)", 
-            "Sentetik Malzemeler (3 çeşit)", "Metal (Sınırlı - sadece markalama)"
-        ],
-        "example_request": {
-            "machineBrand": "xTool D1 Pro",
-            "laserPower": 20,
-            "materialType": "Ahşap",
-            "materialThickness": 3,
-            "processes": ["cutting", "engraving"]
-        }
     }
 
 
-@app.get("/materials")
-async def get_supported_materials():
-    """✅ AppConfig uyumlu malzeme listesi - kategorik yapı"""
-    return {
-        "supported_materials": {
-            "ahsap_urunleri": [
-                {"name": "Ahşap", "key": "ahsap", "max_thickness": 8, "difficulty": "Orta"},
-                {"name": "Kontrplak", "key": "kontrplak", "max_thickness": 10, "difficulty": "Orta"},
-                {"name": "MDF", "key": "mdf", "max_thickness": 8, "difficulty": "Orta"},
-                {"name": "Balsa Ağacı", "key": "balsa", "max_thickness": 10, "difficulty": "Kolay"},
-                {"name": "Bambu", "key": "bambu", "max_thickness": 8, "difficulty": "Orta"},
-                {"name": "Kayın", "key": "kayin", "max_thickness": 6, "difficulty": "Zor"},
-                {"name": "Meşe", "key": "mese", "max_thickness": 5, "difficulty": "Zor"},
-                {"name": "Ceviz", "key": "ceviz", "max_thickness": 5, "difficulty": "Zor"},
-                {"name": "Akçaağaç", "key": "akcaagac", "max_thickness": 5, "difficulty": "Zor"},
-                {"name": "Huş Ağacı", "key": "hus", "max_thickness": 6, "difficulty": "Orta"},
-                {"name": "Çam", "key": "cam", "max_thickness": 6, "difficulty": "Orta"}
-            ],
-            "organik_malzemeler": [
-                {"name": "Deri", "key": "deri", "max_thickness": 5, "difficulty": "Kolay"},
-                {"name": "Karton", "key": "karton", "max_thickness": 5, "difficulty": "Çok Kolay"},
-                {"name": "Kağıt", "key": "kagit", "max_thickness": 2, "difficulty": "Çok Kolay"},
-                {"name": "Kumaş", "key": "kumas", "max_thickness": 3, "difficulty": "Çok Kolay"},
-                {"name": "Keçe", "key": "kece", "max_thickness": 4, "difficulty": "Çok Kolay"},
-                {"name": "Mantar", "key": "mantar", "max_thickness": 6, "difficulty": "Kolay"}
-            ],
-            "sentetik_malzemeler": [
-                {"name": "Akrilik", "key": "akrilik", "max_thickness": 3, "difficulty": "Orta", 
-                 "warning": "Sadece bazı diode lazerler destekler"},
-                {"name": "Lastik", "key": "lastik", "max_thickness": 5, "difficulty": "Orta"},
-                {"name": "Köpük", "key": "kopuk", "max_thickness": 10, "difficulty": "Çok Kolay"}
-            ],
-            "metal_sinirli": [
-                {"name": "Anodize Alüminyum", "key": "anodize_aluminyum", "max_thickness": 1, 
-                 "difficulty": "Çok Zor", "warning": "Sadece markalama için, kesim değil"}
-            ]
-        },
-        "not_supported": [
-            "Metal (Fiber lazer gerektirir)",
-            "Cam (Fiber lazer gerektirir)",
-            "Seramik",
-            "Taş"
-        ],
-        "notes": [
-            "Diode lazerler 2W-40W güç aralığında çalışır",
-            "En iyi sonuçlar 3-5mm kalınlıkta alınır",
-            "8mm üzeri kesim çok zordur ve önerilmez",
-            "Organik malzemeler (ahşap, deri, kağıt) en iyi sonuçları verir"
-        ],
-        "categories_info": {
-            "ahsap_urunleri": "11 çeşit ahşap malzeme - en yaygın kullanım",
-            "organik_malzemeler": "6 çeşit doğal organik malzeme",
-            "sentetik_malzemeler": "3 çeşit sentetik malzeme (bazı kısıtlamalar)",
-            "metal_sinirli": "Sadece markalama için (kesim yapılamaz)"
+@app.post("/admin/save-model-to-storage")
+async def save_model_to_storage():
+    """
+    Admin endpoint: Manually save current model to Firebase Storage
+    
+    Usage: POST /admin/save-model-to-storage
+    """
+    storage_service = get_storage_service()
+    
+    if not storage_service.is_available():
+        raise HTTPException(status_code=503, detail="Firebase Storage not available")
+    
+    if not transfer_model or not transfer_model.is_trained:
+        raise HTTPException(status_code=400, detail="No trained model to save")
+    
+    try:
+        local_model_path = "models/diode_laser_transfer_v1.h5"
+        
+        # Ensure model is saved locally first
+        os.makedirs("models", exist_ok=True)
+        transfer_model.save_model(local_model_path)
+        
+        # Upload to Firebase Storage
+        success = storage_service.save_model_to_storage(local_model_path)
+        
+        if success:
+            metadata = storage_service.get_model_metadata()
+            return {
+                "status": "success",
+                "message": "Model uploaded to Firebase Storage",
+                "size_mb": round(metadata['size_mb'], 2) if metadata else None,
+            }
+        else:
+            raise HTTPException(status_code=500, detail="Failed to upload model")
+            
+    except Exception as e:
+        logger.exception("Error saving model to storage")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/load-model-from-storage")
+async def load_model_from_storage():
+    """
+    Admin endpoint: Manually load model from Firebase Storage
+    
+    Usage: POST /admin/load-model-from-storage
+    """
+    global transfer_model
+    
+    storage_service = get_storage_service()
+    
+    if not storage_service.is_available():
+        raise HTTPException(status_code=503, detail="Firebase Storage not available")
+    
+    if not TF_AVAILABLE:
+        raise HTTPException(status_code=503, detail="TensorFlow not available")
+    
+    try:
+        local_model_path = "models/diode_laser_transfer_v1.h5"
+        
+        # Download from Firebase Storage
+        success = storage_service.load_model_from_storage(local_model_path)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail="Model not found in Firebase Storage")
+        
+        # Load the model
+        transfer_model = get_transfer_model(local_model_path)
+        
+        return {
+            "status": "success",
+            "message": "Model loaded from Firebase Storage",
+            "is_trained": transfer_model.is_trained,
         }
-    }
+        
+    except Exception as e:
+        logger.exception("Error loading model from storage")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-# ============= STARTUP/SHUTDOWN =============
+# ============= STARTUP =============
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize services on startup"""
-    logger.info("="*50)
-    logger.info("🚀 LaserTuner ML API v3.0 - DIODE LASER EDITION")
-    logger.info("⚡ Power Range: 2W - 40W")
-    logger.info("✅ AppConfig Compatible Material System")
-    logger.info(f"Allowed Origins: {ALLOWED_ORIGINS}")
+    """
+    🚀 TRANSFER LEARNING INITIALIZATION WITH FIREBASE STORAGE
     
-    # Initialize Firebase
+    Steps:
+    1. Initialize feature encoder
+    2. Connect to Firebase (Firestore + Storage)
+    3. Try to load model from Firebase Storage
+    4. If not in storage, load from local or create new
+    5. Train/fine-tune if enough data (50+ verified experiments)
+    6. Save updated model back to Firebase Storage
+    """
+    global transfer_model, feature_encoder
+    
+    logger.info("="*60)
+    logger.info("🚀 LaserTuner ML API v3.0 - DIODE LASER EDITION")
+    logger.info("⚡ Transfer Learning System Starting...")
+    logger.info(f"🤖 TensorFlow Available: {TF_AVAILABLE}")
+    
+    # 1. Initialize feature encoder
+    try:
+        feature_encoder = get_feature_encoder()
+        logger.info("✅ Feature encoder initialized")
+    except Exception as e:
+        logger.error(f"❌ Feature encoder failed: {e}")
+        feature_encoder = None
+    
+    # 2. Initialize Firebase (Firestore + Storage)
     firebase = get_firebase_service()
+    storage_service = get_storage_service()
+    
     if firebase.is_available():
         stats = firebase.get_statistics()
-        logger.info(f"✅ Firebase connected")
-        logger.info(f"📊 Total experiments: {stats.get('total_experiments', 0)}")
-        logger.info(f"✅ Verified experiments: {stats.get('verified_experiments', 0)}")
-        
-        # ✨ YENI: Online learning başlat
-        try:
-            learner = get_online_learner()
-            if learner.should_update():
-                logger.info("🔄 Running online learning update...")
-                learner.update_material_statistics()
-        except Exception as e:
-            logger.warning(f"⚠️ Online learning initialization failed: {e}")
+        logger.info(f"✅ Firebase Firestore connected: {stats.get('verified_experiments', 0)} verified")
     else:
-        logger.warning("⚠️ Firebase not available - using diode laser algorithms only")
+        logger.warning("⚠️ Firebase Firestore not available")
     
-    logger.info("="*50)
+    if storage_service.is_available():
+        logger.info("✅ Firebase Storage connected")
+    else:
+        logger.warning("⚠️ Firebase Storage not available")
+    
+    # 3. Initialize Transfer Learning Model
+    if TF_AVAILABLE and feature_encoder:
+        try:
+            local_model_path = "models/diode_laser_transfer_v1.h5"
+            model_loaded = False
+            
+            # ===== STEP 1: Try Firebase Storage first =====
+            if storage_service.is_available() and storage_service.model_exists_in_storage():
+                logger.info("📦 Model found in Firebase Storage, downloading...")
+                
+                if storage_service.load_model_from_storage(local_model_path):
+                    transfer_model = get_transfer_model(local_model_path)
+                    model_loaded = True
+                    logger.info("✅ Model loaded from Firebase Storage")
+                    
+                    # Log metadata
+                    metadata = storage_service.get_model_metadata()
+                    if metadata:
+                        logger.info(f"   📊 Model size: {metadata['size_mb']:.2f} MB")
+                        logger.info(f"   📅 Last updated: {metadata['updated']}")
+                else:
+                    logger.warning("⚠️ Failed to download from Firebase Storage")
+            
+            # ===== STEP 2: Try local file =====
+            if not model_loaded and os.path.exists(local_model_path):
+                logger.info(f"📂 Loading model from local: {local_model_path}")
+                transfer_model = get_transfer_model(local_model_path)
+                model_loaded = True
+                logger.info("✅ Model loaded from local file")
+            
+            # ===== STEP 3: Create new model =====
+            if not model_loaded:
+                logger.info("🆕 No existing model found, creating new...")
+                transfer_model = get_transfer_model()
+                logger.info("✅ New model architecture created")
+            
+            # ===== STEP 4: Train/Fine-tune if enough data =====
+            should_save_to_storage = False
+            
+            if firebase.is_available() and transfer_model:
+                stats = firebase.get_statistics()
+                verified_count = stats.get('verified_experiments', 0)
+                
+                if verified_count >= 50:
+                    logger.info(f"📄 Training with {verified_count} experiments...")
+                    
+                    try:
+                        training_data = firebase.get_training_data_for_transfer_learning(limit=500)
+                        
+                        if len(training_data) >= 30:
+                            X, y_power, y_speed, y_passes = feature_encoder.encode_batch(training_data)
+                            logger.info(f"   📊 Training samples: {len(X)}, Features: {X.shape}")
+                            
+                            if transfer_model.is_trained:
+                                logger.info("   🔧 Fine-tuning existing model...")
+                                transfer_model.fine_tune(X, y_power, y_speed, y_passes, epochs=50)
+                            else:
+                                logger.info("   🆕 Training from scratch...")
+                                transfer_model.train(X, y_power, y_speed, y_passes, 
+                                                   epochs=100, save_path=local_model_path)
+                            
+                            # Save locally first
+                            os.makedirs("models", exist_ok=True)
+                            transfer_model.save_model(local_model_path)
+                            
+                            metrics = transfer_model.evaluate(X, y_power, y_speed, y_passes)
+                            logger.info(f"✅ Training complete! Metrics: {metrics}")
+                            
+                            should_save_to_storage = True
+                        else:
+                            logger.warning(f"⚠️ Only {len(training_data)} samples, need 30+")
+                    except Exception as e:
+                        logger.error(f"❌ Training failed: {e}")
+                        logger.exception("Full error:")
+                else:
+                    logger.warning(f"⚠️ Only {verified_count} verified experiments, need 50+")
+            
+            # ===== STEP 5: Upload to Firebase Storage =====
+            if should_save_to_storage and storage_service.is_available():
+                logger.info("📤 Uploading updated model to Firebase Storage...")
+                
+                if storage_service.save_model_to_storage(local_model_path):
+                    logger.info("✅ Model successfully uploaded to Firebase Storage")
+                else:
+                    logger.warning("⚠️ Failed to upload model to Firebase Storage")
+            elif not model_loaded and storage_service.is_available() and os.path.exists(local_model_path):
+                # Upload initial model if it was just created locally
+                logger.info("📤 Uploading initial model to Firebase Storage...")
+                storage_service.save_model_to_storage(local_model_path)
+        
+        except Exception as e:
+            logger.error(f"❌ Transfer model init failed: {e}")
+            logger.exception("Full error:")
+            transfer_model = None
+    else:
+        logger.warning("⚠️ Transfer learning disabled (no TF or encoder)")
+        transfer_model = None
+    
+    # 4. Online learning (optional)
+    try:
+        learner = get_online_learner()
+        if learner.should_update():
+            logger.info("📄 Running online learning update...")
+            learner.update_material_statistics()
+    except Exception as e:
+        logger.warning(f"⚠️ Online learning failed: {e}")
+    
+    logger.info("="*60)
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Cleanup on shutdown"""
+    """Cleanup"""
     logger.info("👋 LaserTuner ML API Shutting down...")
 
 
@@ -639,16 +642,8 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
-    
     port = int(os.getenv("PORT", 8000))
     host = os.getenv("HOST", "0.0.0.0")
-    
-    logger.info(f"Starting Diode Laser API on {host}:{port}")
-    
-    uvicorn.run(
-        "main:app",
-        host=host,
-        port=port,
-        reload=os.getenv("ENV", "production") == "development",
-        log_level="info"
-    )
+    logger.info(f"Starting API on {host}:{port}")
+    uvicorn.run("main:app", host=host, port=port, 
+                reload=os.getenv("ENV") == "development", log_level="info")

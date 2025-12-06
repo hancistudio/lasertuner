@@ -1,12 +1,22 @@
+# FastAPI ve Web Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 pydantic==2.5.0
 python-dotenv==1.0.0
+
+# Numerical Computing
 numpy==1.24.3
 
-# Firebase Admin SDK
+# Firebase Admin SDK (includes Firestore + Storage)
 firebase-admin==6.2.0
 
-# Google Cloud dependencies
+# Google Cloud Dependencies
 google-cloud-firestore==2.13.1
+google-cloud-storage==2.10.0
 google-auth==2.23.4
+
+# TensorFlow for Transfer Learning (lightweight CPU version)
+tensorflow-cpu==2.15.0
+
+# Protobuf compatibility fix
+protobuf==4.23.4

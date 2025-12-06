@@ -42,7 +42,7 @@ class FirebaseService:
             
             for cred_path in possible_paths:
                 if os.path.exists(cred_path):
-                    logger.info(f"🔍 Found credentials at: {cred_path}")
+                    logger.info(f"🔑 Found credentials at: {cred_path}")
                     cred = credentials.Certificate(cred_path)
                     firebase_admin.initialize_app(cred)
                     self.db = firestore.client()
@@ -243,6 +243,99 @@ class FirebaseService:
             logger.error(f"❌ Error fetching all experiments: {e}")
             return []
     
+    def get_training_data_for_transfer_learning(self, limit: int = 1000) -> List[Dict]:
+        """
+        Transfer learning için format edilmiş eğitim verisi döndür
+        Her process type için ayrı satır oluşturur
+        
+        Returns:
+            List[Dict] with format:
+            {
+                'materialType': str,
+                'materialThickness': float,
+                'laserPower': float,
+                'processType': str,  # 'cutting' | 'engraving' | 'scoring'
+                'targetPower': float,  # Output (% olarak)
+                'targetSpeed': float,  # Output (mm/s olarak)
+                'targetPasses': int,   # Output
+                'quality': int,
+                'dataSource': str  # 'user' | 'researcher' | 'researcher_import'
+            }
+        """
+        if not self.is_available():
+            logger.warning("Firebase not available for training data")
+            return []
+        
+        try:
+            # Sadece verified ve diode lazer deneyleri
+            experiments_ref = self.db.collection('experiments')
+            query = experiments_ref.where(
+                filter=FieldFilter('verificationStatus', '==', 'verified')
+            ).limit(limit)
+            
+            docs = query.stream()
+            training_data = []
+            
+            for doc in docs:
+                data = doc.to_dict()
+                laser_power = data.get('laserPower', 0)
+                
+                # Sadece diode lazerler (2-40W)
+                if not (2 <= laser_power <= 40):
+                    continue
+                
+                # Her process type için ayrı eğitim örneği oluştur
+                processes = data.get('processes', {})
+                quality_scores = data.get('qualityScores', {})
+                
+                for process_type, process_params in processes.items():
+                    # Process params dict olmalı
+                    if not isinstance(process_params, dict):
+                        continue
+                    
+                    training_sample = {
+                        'materialType': data.get('materialType', ''),
+                        'materialThickness': data.get('materialThickness', 0),
+                        'laserPower': laser_power,
+                        'processType': process_type,
+                        
+                        # Target outputs
+                        'targetPower': process_params.get('power', 0),
+                        'targetSpeed': process_params.get('speed', 0),
+                        'targetPasses': process_params.get('passes', 1),
+                        
+                        # Metadata
+                        'quality': quality_scores.get(process_type, 5),
+                        'dataSource': data.get('dataSource', 'user'),
+                    }
+                    
+                    training_data.append(training_sample)
+            
+            logger.info(
+                f"📊 Prepared {len(training_data)} training samples "
+                f"from {limit} experiment queries"
+            )
+            
+            # Log statistics
+            if training_data:
+                materials = {}
+                processes_count = {}
+                for sample in training_data:
+                    mat = sample['materialType']
+                    proc = sample['processType']
+                    materials[mat] = materials.get(mat, 0) + 1
+                    processes_count[proc] = processes_count.get(proc, 0) + 1
+                
+                logger.info(f"   Materials: {materials}")
+                logger.info(f"   Processes: {processes_count}")
+            
+            return training_data
+            
+        except Exception as e:
+            logger.error(f"❌ Error fetching training data: {e}")
+            logger.exception("Full error:")
+            return []
+
     def get_statistics(self, only_diode: bool = True) -> Dict:
         """
         Get database statistics
