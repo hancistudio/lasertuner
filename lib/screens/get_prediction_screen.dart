@@ -444,6 +444,77 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
             ),
             textAlign: TextAlign.center,
           ),
+          FutureBuilder<Map<String, dynamic>?>(
+            future: _mlService.getModelStatus(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData && snapshot.data != null) {
+                final data = snapshot.data!;
+                final isTrained = data['transfer_learning_trained'] == true;
+                final totalExperiments = data['total_experiments'] ?? 0;
+
+                return Container(
+                  margin: const EdgeInsets.only(top: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isTrained ? Icons.check_circle : Icons.pending,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              isTrained
+                                  ? '🤖 Transfer Learning Modeli Aktif'
+                                  : '⚙️ Statik Algoritma Kullanılıyor',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: isMobile ? 13 : 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Veri tabanında $totalExperiments doğrulanmış deney',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.9),
+                          fontSize: isMobile ? 11 : 12,
+                        ),
+                      ),
+                      if (!isTrained && totalExperiments < 50)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            '50+ deney gerekli (şu an: $totalExperiments)',
+                            style: TextStyle(
+                              color: Colors.orange.shade200,
+                              fontSize: isMobile ? 10 : 11,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           if (!_apiHealthy && !_isCheckingHealth) ...[
             const SizedBox(height: 16),
             Container(
@@ -1328,9 +1399,8 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                           ),
                         ),
                         Text(
-                          result.dataSource == 'gemini_ai'
-                              ? 'Yapay Zeka Önerisi'
-                              : 'Topluluk Verisi',
+                          result
+                              .getDataSourceDescription(), // ✅ Yeni metod kullanılıyor
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey.shade600,
@@ -1345,10 +1415,69 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
               _buildConfidenceIndicator(result, accentColor, isMobile),
               const SizedBox(height: 24),
-
+              if (result.hasWarnings()) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.warning_amber,
+                            color: Colors.orange,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Önemli Uyarılar',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade900,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ...result.warnings.map((warning) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.arrow_right,
+                                color: Colors.orange,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  warning,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.orange.shade900,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
               ...result.predictions.entries.map((entry) {
                 return _buildProcessResult(entry, accentColor, isMobile);
-              }).toList(),
+              }),
 
               if (result.notes.isNotEmpty) ...[
                 const SizedBox(height: 20),

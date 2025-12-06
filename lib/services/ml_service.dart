@@ -28,9 +28,56 @@ class MLService {
     }
   }
 
+  /// ✅ YENİ: Detaylı API sağlık durumu
+  Future<ApiHealthStatus?> getHealthStatus() async {
+    try {
+      print('🔍 Fetching detailed health status: $API_URL/health');
+
+      final response = await http
+          .get(Uri.parse('$API_URL/health'))
+          .timeout(connectionTimeout);
+
+      print('✅ Health status response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return ApiHealthStatus.fromMap(data);
+      }
+      return null;
+    } catch (e) {
+      print('❌ Health status fetch failed: $e');
+      return null;
+    }
+  }
+
+  /// ✅ YENİ: Model durumunu getir (eğitildi mi, kaç deney var?)
+  Future<Map<String, dynamic>?> getModelStatus() async {
+    try {
+      print('📊 Fetching model status from: $API_URL/test');
+
+      final response = await http
+          .get(Uri.parse('$API_URL/test'))
+          .timeout(connectionTimeout);
+
+      print('✅ Model status response: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        print('📊 Model Status Data: $data');
+        return data;
+      }
+      return null;
+    } catch (e) {
+      print('❌ Model status fetch error: $e');
+      return null;
+    }
+  }
+
   /// İstatistikleri getir
   Future<Map<String, dynamic>?> getStatistics() async {
     try {
+      print('📊 Fetching statistics from: $API_URL/statistics');
+
       final response = await http
           .get(Uri.parse('$API_URL/statistics'))
           .timeout(requestTimeout);
@@ -40,7 +87,7 @@ class MLService {
       }
       return null;
     } catch (e) {
-      print('Statistics fetch error: $e');
+      print('❌ Statistics fetch error: $e');
       return null;
     }
   }
@@ -92,12 +139,120 @@ class MLService {
     }
   }
 
+  /// ✅ YENİ: Model storage bilgilerini getir
+  Future<Map<String, dynamic>?> getModelStorageInfo() async {
+    try {
+      print('🗄️ Fetching model storage info from: $API_URL/test');
+
+      final response = await http
+          .get(Uri.parse('$API_URL/test'))
+          .timeout(connectionTimeout);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        // Model storage bilgisi varsa döndür
+        if (data['model_storage'] != null) {
+          return data['model_storage'] as Map<String, dynamic>;
+        }
+      }
+      return null;
+    } catch (e) {
+      print('❌ Model storage info fetch error: $e');
+      return null;
+    }
+  }
+
+  /// ✅ YENİ: API'nin tüm yeteneklerini kontrol et
+  Future<Map<String, bool>> checkApiCapabilities() async {
+    try {
+      final testResponse = await http
+          .get(Uri.parse('$API_URL/test'))
+          .timeout(connectionTimeout);
+
+      if (testResponse.statusCode == 200) {
+        final data = jsonDecode(testResponse.body);
+
+        return {
+          'transfer_learning_enabled':
+              data['transfer_learning_enabled'] ?? false,
+          'transfer_learning_trained':
+              data['transfer_learning_trained'] ?? false,
+          'firebase_firestore_connected':
+              data['firebase_firestore_connected'] ?? false,
+          'firebase_storage_connected':
+              data['firebase_storage_connected'] ?? false,
+        };
+      }
+
+      return {
+        'transfer_learning_enabled': false,
+        'transfer_learning_trained': false,
+        'firebase_firestore_connected': false,
+        'firebase_storage_connected': false,
+      };
+    } catch (e) {
+      print('❌ API capabilities check error: $e');
+      return {
+        'transfer_learning_enabled': false,
+        'transfer_learning_trained': false,
+        'firebase_firestore_connected': false,
+        'firebase_storage_connected': false,
+      };
+    }
+  }
+
+  /// ✅ YENİ: Detaylı sistem durumu raporu
+  Future<Map<String, dynamic>> getSystemStatusReport() async {
+    try {
+      final healthStatus = await getHealthStatus();
+      final capabilities = await checkApiCapabilities();
+      final storageInfo = await getModelStorageInfo();
+
+      return {
+        'timestamp': DateTime.now().toIso8601String(),
+        'api_online': healthStatus?.isHealthy ?? false,
+        'firebase_connected': healthStatus?.firebaseConnected ?? false,
+        'total_experiments': healthStatus?.totalExperiments ?? 0,
+        'transfer_learning_enabled': capabilities['transfer_learning_enabled'],
+        'transfer_learning_trained': capabilities['transfer_learning_trained'],
+        'model_in_storage': storageInfo?['exists_in_storage'] ?? false,
+        'model_size_mb': storageInfo?['size_mb'] ?? 0.0,
+        'capabilities': capabilities,
+      };
+    } catch (e) {
+      print('❌ System status report error: $e');
+      return {
+        'timestamp': DateTime.now().toIso8601String(),
+        'api_online': false,
+        'error': e.toString(),
+      };
+    }
+  }
+
   /// Fallback: Basit tahmin (API çalışmazsa)
   PredictionResponse generateFallbackPrediction(PredictionRequest request) {
     print('⚠️ Using DIODE LASER fallback prediction algorithm');
 
     Map<String, ProcessParams> predictions = {};
     double thickness = request.materialThickness;
+    List<String> warnings = []; // ✅ YENİ: Warnings ekle
+
+    // ✅ YENİ: Kalınlık uyarısı
+    if (thickness > 8) {
+      warnings.add(
+        '⚠️ ${thickness}mm kalınlık diode lazer için çok zorlu olabilir',
+      );
+    } else if (thickness > 5) {
+      warnings.add('⚠️ ${thickness}mm kalınlık için dikkatli yaklaşın');
+    }
+
+    // ✅ YENİ: Güç uyarısı
+    if (request.laserPower < 20 && thickness > 3) {
+      warnings.add(
+        '⚠️ ${request.laserPower}W güç, ${thickness}mm kalınlık için düşük olabilir',
+      );
+    }
 
     for (String processType in request.processes) {
       ProcessParams params;
@@ -144,11 +299,13 @@ class MLService {
           '⚠️ API bağlantısı kurulamadı, diode lazer algoritması kullanıldı. '
           'İnternet bağlantınızı kontrol edin.',
       dataPointsUsed: 0,
-      dataSource: 'static_algorithm',
+      dataSource: 'fallback', // ✅ Değiştirildi: static_algorithm → fallback
+      warnings: warnings, // ✅ YENİ: Warnings ekle
     );
   }
 
-  // ✨ DIODE LASER SPECIFIC CALCULATIONS
+  // ========== DIODE LASER HESAPLAMA FONKSİYONLARI ==========
+
   double _calculateDiodeCuttingPower(String material, double thickness) {
     double basePower;
     double multiplier;
@@ -164,6 +321,20 @@ class MLService {
         basePower = 85;
         multiplier = 4.5;
         break;
+      case 'kontrplak':
+      case 'plywood':
+        basePower = 82;
+        multiplier = 4.2;
+        break;
+      case 'balsa':
+        basePower = 60;
+        multiplier = 2.5;
+        break;
+      case 'bambu':
+      case 'bamboo':
+        basePower = 85;
+        multiplier = 4.5;
+        break;
       case 'karton':
       case 'cardboard':
         basePower = 50;
@@ -175,6 +346,7 @@ class MLService {
         multiplier = 3.5;
         break;
       case 'keçe':
+      case 'kece':
       case 'felt':
         basePower = 60;
         multiplier = 2.5;
@@ -202,6 +374,16 @@ class MLService {
         basePower = 65;
         multiplier = 3.0;
         break;
+      case 'akrilik':
+      case 'acrylic':
+        basePower = 75;
+        multiplier = 4.0;
+        break;
+      case 'lastik':
+      case 'rubber':
+        basePower = 70;
+        multiplier = 3.5;
+        break;
       default:
         basePower = 75;
         multiplier = 3.5;
@@ -226,6 +408,20 @@ class MLService {
         baseSpeed = 280;
         reduction = 35;
         break;
+      case 'kontrplak':
+      case 'plywood':
+        baseSpeed = 290;
+        reduction = 32;
+        break;
+      case 'balsa':
+        baseSpeed = 380;
+        reduction = 20;
+        break;
+      case 'bambu':
+      case 'bamboo':
+        baseSpeed = 280;
+        reduction = 35;
+        break;
       case 'karton':
       case 'cardboard':
         baseSpeed = 400;
@@ -237,6 +433,7 @@ class MLService {
         reduction = 28;
         break;
       case 'keçe':
+      case 'kece':
       case 'felt':
         baseSpeed = 380;
         reduction = 20;
@@ -263,6 +460,16 @@ class MLService {
       case 'cork':
         baseSpeed = 360;
         reduction = 22;
+        break;
+      case 'akrilik':
+      case 'acrylic':
+        baseSpeed = 280;
+        reduction = 30;
+        break;
+      case 'lastik':
+      case 'rubber':
+        baseSpeed = 350;
+        reduction = 28;
         break;
       default:
         baseSpeed = 320;
@@ -309,5 +516,35 @@ class MLService {
     return 8; // Max for diode
   }
 
-  // Materyal bazlı hesaplama yardımcıları
+  // ========== YARDIMCI FONKSİYONLAR ==========
+
+  /// ✅ YENİ: API URL'sini kontrol et
+  static bool isValidApiUrl() {
+    return API_URL.isNotEmpty &&
+        (API_URL.startsWith('http://') || API_URL.startsWith('https://'));
+  }
+
+  /// ✅ YENİ: Endpoint oluştur
+  static String buildEndpoint(String path) {
+    return '$API_URL${path.startsWith('/') ? path : '/$path'}';
+  }
+
+  /// ✅ YENİ: Hata mesajını kullanıcı dostu yap
+  String getFriendlyErrorMessage(dynamic error) {
+    final errorStr = error.toString().toLowerCase();
+
+    if (errorStr.contains('timeout')) {
+      return 'API sunucusu yanıt vermiyor. İlk istekte soğuk başlangıç yapıyor olabilir. Lütfen 10-15 saniye bekleyip tekrar deneyin.';
+    } else if (errorStr.contains('socket') || errorStr.contains('connection')) {
+      return 'İnternet bağlantınızı kontrol edin. API sunucusuna erişilemiyor.';
+    } else if (errorStr.contains('422')) {
+      return 'Gönderilen veri formatı hatalı. Lütfen girilen değerleri kontrol edin.';
+    } else if (errorStr.contains('500')) {
+      return 'Sunucu hatası oluştu. Lütfen birkaç dakika sonra tekrar deneyin.';
+    } else if (errorStr.contains('404')) {
+      return 'İstenen API endpoint bulunamadı. Uygulama güncellemesi gerekebilir.';
+    }
+
+    return 'Beklenmeyen bir hata oluştu. Lütfen tekrar deneyin.';
+  }
 }

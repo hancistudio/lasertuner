@@ -42,7 +42,8 @@ class PredictionResponse {
   final double confidenceScore;
   final String notes;
   final int dataPointsUsed;
-  final String dataSource; // ✨ YENİ
+  final String dataSource;
+  final List<String> warnings; // ✅ YENİ
 
   PredictionResponse({
     required this.predictions,
@@ -50,6 +51,7 @@ class PredictionResponse {
     required this.notes,
     required this.dataPointsUsed,
     required this.dataSource,
+    this.warnings = const [], // ✅ YENİ
   });
 
   factory PredictionResponse.fromMap(Map<String, dynamic> map) {
@@ -66,7 +68,8 @@ class PredictionResponse {
       confidenceScore: (map['confidenceScore'] ?? 0).toDouble(),
       notes: map['notes'] ?? '',
       dataPointsUsed: map['dataPointsUsed'] ?? 0,
-      dataSource: map['dataSource'] ?? 'static_algorithm', // ✨ YENİ
+      dataSource: map['dataSource'] ?? 'static_algorithm',
+      warnings: List<String>.from(map['warnings'] ?? []), // ✅ YENİ
     );
   }
 
@@ -82,46 +85,109 @@ class PredictionResponse {
       'notes': notes,
       'dataPointsUsed': dataPointsUsed,
       'dataSource': dataSource,
+      'warnings': warnings, // ✅ YENİ
     };
   }
 
-  // ✨ YENİ: Veri kaynağına göre ikon
+  // ✅ YENİ: Veri kaynağına göre ikon
   IconData getDataSourceIcon() {
     switch (dataSource) {
-      case 'user_data':
-        return Icons.groups;
-      case 'hybrid':
-        return Icons.merge_type;
+      case 'transfer_learning': // Backend'den gelen değer
+        return Icons.psychology;
       case 'static_algorithm':
-      default:
         return Icons.calculate;
+      case 'gemini_ai':
+        return Icons.auto_awesome;
+      case 'fallback': // Backend'den gelen değer
+        return Icons.engineering;
+      default:
+        return Icons.info;
     }
   }
 
-  // ✨ YENİ: Veri kaynağına göre renk
+  // ✅ YENİ: Veri kaynağına göre renk
   Color getDataSourceColor() {
     switch (dataSource) {
-      case 'user_data':
-        return Colors.green;
-      case 'hybrid':
-        return Colors.orange;
+      case 'transfer_learning':
+        return Colors.purple;
       case 'static_algorithm':
+        return Colors.grey;
+      case 'gemini_ai':
+        return Colors.blue;
+      case 'fallback':
+        return Colors.orange;
       default:
         return Colors.grey;
     }
   }
 
-  // ✨ YENİ: Veri kaynağına göre açıklama
+  // ✅ GÜNCELLENDİ: Veri kaynağına göre açıklama
   String getDataSourceDescription() {
     switch (dataSource) {
-      case 'user_data':
-        return 'Topluluk verileriyle tahmin edildi';
-      case 'hybrid':
-        return 'Kısmi topluluk verisi kullanıldı';
+      case 'transfer_learning':
+        return '🤖 Transfer learning model (Firebase verisi ile eğitildi)';
       case 'static_algorithm':
+        return '⚙️ Statik algoritma (Model henüz eğitilmedi veya yeterli veri yok)';
+      case 'gemini_ai':
+        return '🌟 Gemini AI ile tahmin edildi';
+      case 'fallback':
+        return '⚠️ Fallback algoritma (API geçici olarak kullanılamıyor)';
       default:
-        return 'Temel algoritma ile tahmin edildi';
+        return '📊 Tahmin tamamlandı';
     }
+  }
+
+  // ✅ YENİ: Güvenilirlik seviyesi
+  String getConfidenceLevel() {
+    if (confidenceScore >= 0.80) {
+      return 'Yüksek Güvenilirlik';
+    } else if (confidenceScore >= 0.65) {
+      return 'Orta Güvenilirlik';
+    } else {
+      return 'Düşük Güvenilirlik';
+    }
+  }
+
+  // ✅ YENİ: Güvenilirlik rengi
+  Color getConfidenceColor() {
+    if (confidenceScore >= 0.80) {
+      return Colors.green;
+    } else if (confidenceScore >= 0.65) {
+      return Colors.orange;
+    } else {
+      return Colors.red;
+    }
+  }
+
+  // ✅ YENİ: Veri kaynağı öncelik sırası (karşılaştırma için)
+  int getDataSourcePriority() {
+    switch (dataSource) {
+      case 'transfer_learning':
+        return 1; // En yüksek öncelik
+      case 'gemini_ai':
+        return 2;
+      case 'static_algorithm':
+        return 3;
+      case 'fallback':
+        return 4; // En düşük öncelik
+      default:
+        return 5;
+    }
+  }
+
+  // ✅ YENİ: Veri kaynağı güvenilir mi?
+  bool isReliableSource() {
+    return dataSource == 'transfer_learning' || dataSource == 'gemini_ai';
+  }
+
+  // ✅ YENİ: Uyarı var mı?
+  bool hasWarnings() {
+    return warnings.isNotEmpty;
+  }
+
+  // ✅ YENİ: Kritik uyarı var mı? (⚠️ ile başlayan)
+  bool hasCriticalWarnings() {
+    return warnings.any((warning) => warning.startsWith('⚠️'));
   }
 }
 
@@ -133,6 +199,8 @@ class ApiHealthStatus {
   final Map<String, dynamic>? details;
   final bool firebaseConnected;
   final int totalExperiments;
+  final bool transferLearningEnabled; // ✅ YENİ
+  final bool transferLearningTrained; // ✅ YENİ
 
   ApiHealthStatus({
     required this.isHealthy,
@@ -141,6 +209,8 @@ class ApiHealthStatus {
     this.details,
     this.firebaseConnected = false,
     this.totalExperiments = 0,
+    this.transferLearningEnabled = false, // ✅ YENİ
+    this.transferLearningTrained = false, // ✅ YENİ
   });
 
   factory ApiHealthStatus.fromMap(Map<String, dynamic> map) {
@@ -150,7 +220,47 @@ class ApiHealthStatus {
       details: map,
       firebaseConnected: map['firebase_status'] == 'connected',
       totalExperiments: map['total_experiments'] ?? 0,
+      transferLearningEnabled:
+          map['transfer_learning_enabled'] ?? false, // ✅ YENİ
+      transferLearningTrained:
+          map['transfer_learning_trained'] ?? false, // ✅ YENİ
     );
+  }
+
+  // ✅ YENİ: Model durumu mesajı
+  String getModelStatusMessage() {
+    if (!transferLearningEnabled) {
+      return 'Transfer Learning kapalı';
+    }
+    if (transferLearningTrained) {
+      return 'Model eğitildi ve aktif';
+    }
+    if (totalExperiments < 50) {
+      return 'Model eğitimi için $totalExperiments/50 deney mevcut';
+    }
+    return 'Model eğitiliyor...';
+  }
+
+  // ✅ YENİ: Model durumu ikonu
+  IconData getModelStatusIcon() {
+    if (!transferLearningEnabled) {
+      return Icons.cloud_off;
+    }
+    if (transferLearningTrained) {
+      return Icons.check_circle;
+    }
+    return Icons.pending;
+  }
+
+  // ✅ YENİ: Model durumu rengi
+  Color getModelStatusColor() {
+    if (!transferLearningEnabled) {
+      return Colors.grey;
+    }
+    if (transferLearningTrained) {
+      return Colors.green;
+    }
+    return Colors.orange;
   }
 }
 
@@ -181,5 +291,23 @@ class MLStatistics {
       modelsAvailable: List<String>.from(map['models_available'] ?? []),
       firebaseAvailable: map['available'] ?? false,
     );
+  }
+
+  // ✅ YENİ: En popüler malzeme
+  String? getMostPopularMaterial() {
+    if (materials.isEmpty) return null;
+    return materials.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+  }
+
+  // ✅ YENİ: En popüler makine
+  String? getMostPopularMachine() {
+    if (machines.isEmpty) return null;
+    return machines.entries.reduce((a, b) => a.value > b.value ? a : b).key;
+  }
+
+  // ✅ YENİ: Veri kalitesi yüzdesi
+  double getDataQualityPercentage() {
+    if (totalDataPoints == 0) return 0.0;
+    return (verifiedDataPoints / totalDataPoints) * 100;
   }
 }
