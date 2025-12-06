@@ -22,7 +22,7 @@ class ModelStorageService:
     - load_model_from_storage() → Download model from Firebase Storage
     
     Storage Location:
-    - Bucket: lasertuner-59b92.appspot.com
+    - Bucket: lasertuner-59b92.firebasestorage.app
     - Path: ml_models/diode_laser_transfer_v1.h5
     """
     
@@ -37,7 +37,7 @@ class ModelStorageService:
         try:
             # Default bucket for LaserTuner project
             if bucket_name is None:
-                bucket_name = "lasertuner-59b92.appspot.com"
+                bucket_name = "lasertuner-59b92.firebasestorage.app"
             
             self.bucket = storage.bucket(bucket_name)
             self.model_path = "ml_models/diode_laser_transfer_v1.h5"
