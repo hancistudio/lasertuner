@@ -1526,63 +1526,78 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
         ),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: isMobile ? 60 : 80,
-            height: isMobile ? 60 : 80,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                CircularProgressIndicator(
-                  value: confidence,
-                  strokeWidth: 6,
-                  backgroundColor: Colors.grey.shade300,
-                  valueColor: AlwaysStoppedAnimation<Color>(color),
-                ),
-                Text(
-                  '$percentage%',
-                  style: TextStyle(
-                    fontSize: isMobile ? 18 : 22,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Güven Skoru',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 20),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Güven Skoru',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  percentage >= 80
-                      ? 'Yüksek Güvenilirlik'
-                      : percentage >= 60
-                      ? 'Orta Güvenilirlik'
-                      : 'Düşük Güvenilirlik',
-                  style: TextStyle(
-                    fontSize: isMobile ? 16 : 18,
-                    fontWeight: FontWeight.bold,
-                    color: color,
-                  ),
-                ),
-                if (result.dataPointsUsed > 0) ...[
                   const SizedBox(height: 4),
                   Text(
-                    '${result.dataPointsUsed} benzer deney kullanıldı',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    percentage >= 80
+                        ? 'Yüksek Güvenilirlik'
+                        : percentage >= 60
+                        ? 'Orta Güvenilirlik'
+                        : 'Düşük Güvenilirlik',
+                    style: TextStyle(
+                      fontSize: isMobile ? 16 : 18,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
                   ),
                 ],
-              ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: color,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  '$percentage%',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: confidence,
+              minHeight: 8,
+              backgroundColor: Colors.grey.shade300,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
+          if (result.dataPointsUsed > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${result.dataPointsUsed} benzer deney kullanıldı',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
         ],
       ),
     );
