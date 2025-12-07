@@ -522,39 +522,22 @@ class _ExperimentCardState extends State<_ExperimentCard> {
               ],
             ),
           ),
-
-          // Fotoğraf
           if (widget.experiment.photoUrl.isNotEmpty)
-            InteractiveViewer(
-              panEnabled: true,
-              minScale: 1.0,
-              maxScale: 4.0,
-              child: ClipRRect(
-                child: Image.network(
-                  widget.experiment.photoUrl,
-                  height: isLargeScreen ? 300 : 200,
-                  width: double.infinity,
-                  fit: BoxFit.contain,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
+            Container(
+              height: isLargeScreen ? 300 : 200,
+              child: Builder(
+                builder: (context) {
+                  // Fotoğrafları topla
+                  final photoUrls = <String>[];
+                  if (widget.experiment.photoUrl.isNotEmpty) {
+                    photoUrls.add(widget.experiment.photoUrl);
+                  }
+                  if (widget.experiment.photoUrl2.isNotEmpty) {
+                    photoUrls.add(widget.experiment.photoUrl2);
+                  }
+
+                  if (photoUrls.isEmpty) {
                     return Container(
-                      height: isLargeScreen ? 300 : 200,
-                      color:
-                          isDark ? Colors.grey.shade800 : Colors.grey.shade200,
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          value:
-                              loadingProgress.expectedTotalBytes != null
-                                  ? loadingProgress.cumulativeBytesLoaded /
-                                      loadingProgress.expectedTotalBytes!
-                                  : null,
-                        ),
-                      ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: isLargeScreen ? 300 : 200,
                       color:
                           isDark ? Colors.grey.shade800 : Colors.grey.shade200,
                       child: Center(
@@ -567,11 +550,16 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                         ),
                       ),
                     );
-                  },
-                ),
+                  }
+
+                  return _PhotoCarousel(
+                    photoUrls: photoUrls,
+                    isDark: isDark,
+                    isLarge: isLargeScreen,
+                  );
+                },
               ),
             ),
-
           // İçerik
           Padding(
             padding: EdgeInsets.all(isLargeScreen ? 20 : 16),
@@ -732,6 +720,319 @@ class _ExperimentCardState extends State<_ExperimentCard> {
       default:
         return key;
     }
+  }
+}
+
+// _PhotoCarousel widget'ını _VotingSection'dan önce ekleyin
+
+class _PhotoCarousel extends StatefulWidget {
+  final List<String> photoUrls;
+  final bool isDark;
+  final bool isLarge;
+
+  const _PhotoCarousel({
+    required this.photoUrls,
+    required this.isDark,
+    required this.isLarge,
+  });
+
+  @override
+  State<_PhotoCarousel> createState() => _PhotoCarouselState();
+}
+
+class _PhotoCarouselState extends State<_PhotoCarousel> {
+  late PageController _pageController;
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        PageView.builder(
+          controller: _pageController,
+          itemCount: widget.photoUrls.length,
+          onPageChanged: (index) {
+            setState(() {
+              _currentPage = index;
+            });
+          },
+          itemBuilder: (context, index) {
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => _FullScreenImageViewer(
+                          photoUrls: widget.photoUrls,
+                          initialIndex: index,
+                        ),
+                  ),
+                );
+              },
+              child: Container(
+                color:
+                    widget.isDark ? Colors.grey.shade900 : Colors.grey.shade100,
+                child: Image.network(
+                  widget.photoUrls[index],
+                  width: double.infinity,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value:
+                            loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded /
+                                    loadingProgress.expectedTotalBytes!
+                                : null,
+                        color: widget.isDark ? Colors.white : Colors.deepPurple,
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Center(
+                      child: Icon(
+                        Icons.image_not_supported,
+                        color:
+                            widget.isDark
+                                ? Colors.grey.shade600
+                                : Colors.grey.shade400,
+                        size: 48,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+          },
+        ),
+
+        // Fotoğraf sayısı göstergesi (birden fazla varsa)
+        if (widget.photoUrls.length > 1)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.photo_library, size: 16, color: Colors.white),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${_currentPage + 1}/${widget.photoUrls.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+        // Nokta göstergeleri (birden fazla varsa)
+        if (widget.photoUrls.length > 1)
+          Positioned(
+            bottom: 8,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                widget.photoUrls.length,
+                (index) => Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color:
+                        _currentPage == index
+                            ? Colors.white
+                            : Colors.white.withOpacity(0.4),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // Sol ok (birden fazla fotoğraf varsa)
+        if (widget.photoUrls.length > 1 && _currentPage > 0)
+          Positioned(
+            left: 8,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  _pageController.previousPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.chevron_left,
+                    color: Colors.white,
+                    size: widget.isLarge ? 32 : 28,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // Sağ ok (birden fazla fotoğraf varsa)
+        if (widget.photoUrls.length > 1 &&
+            _currentPage < widget.photoUrls.length - 1)
+          Positioned(
+            right: 8,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: () {
+                  _pageController.nextPage(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.chevron_right,
+                    color: Colors.white,
+                    size: widget.isLarge ? 32 : 28,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _FullScreenImageViewer extends StatefulWidget {
+  final List<String> photoUrls;
+  final int initialIndex;
+
+  const _FullScreenImageViewer({
+    required this.photoUrls,
+    required this.initialIndex,
+  });
+
+  @override
+  State<_FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<_FullScreenImageViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          '${_currentIndex + 1} / ${widget.photoUrls.length}',
+          style: const TextStyle(color: Colors.white),
+        ),
+        centerTitle: true,
+      ),
+      body: PageView.builder(
+        controller: _pageController,
+        itemCount: widget.photoUrls.length,
+        onPageChanged: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+        itemBuilder: (context, index) {
+          return InteractiveViewer(
+            minScale: 1.0,
+            maxScale: 4.0,
+            child: Center(
+              child: Image.network(
+                widget.photoUrls[index],
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Center(
+                    child: CircularProgressIndicator(
+                      value:
+                          loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                      color: Colors.white,
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(
+                    child: Icon(
+                      Icons.image_not_supported,
+                      color: Colors.white,
+                      size: 64,
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
