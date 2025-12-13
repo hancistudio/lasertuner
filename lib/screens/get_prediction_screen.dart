@@ -28,7 +28,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  // Seçili değerler
+  // SeÃ§ili deÄŸerler
   String? _selectedMachine;
   double? _selectedPower;
   String? _selectedMaterial;
@@ -83,27 +83,27 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
   bool _validateInputs() {
     if (_selectedMachine == null) {
-      _showSnackBar('⚠️ Lütfen makine seçin', isError: true);
+      _showSnackBar('âš ï¸ LÃ¼tfen makine seÃ§in', isError: true);
       return false;
     }
     if (_selectedPower == null) {
-      _showSnackBar('⚠️ Lütfen lazer gücü seçin', isError: true);
+      _showSnackBar('âš ï¸ LÃ¼tfen lazer gÃ¼cÃ¼ seÃ§in', isError: true);
       return false;
     }
     if (_selectedMaterial == null) {
-      _showSnackBar('⚠️ Lütfen malzeme seçin', isError: true);
+      _showSnackBar('âš ï¸ LÃ¼tfen malzeme seÃ§in', isError: true);
       return false;
     }
     if (_selectedThickness == null) {
-      _showSnackBar('⚠️ Lütfen kalınlık seçin', isError: true);
+      _showSnackBar('âš ï¸ LÃ¼tfen kalÄ±nlÄ±k seÃ§in', isError: true);
       return false;
     }
     if (!_selectedProcesses.containsValue(true)) {
-      _showSnackBar('⚠️ En az bir işlem tipi seçin', isError: true);
+      _showSnackBar('âš ï¸ En az bir iÅŸlem tipi seÃ§in', isError: true);
       return false;
     }
 
-    // Makine-Malzeme uyumluluğu kontrolü
+    // Makine-Malzeme uyumluluÄŸu kontrolÃ¼
     final machineMaxThickness = AppConfig.getMaxThicknessForMachine(
       _selectedMachine!,
     );
@@ -113,7 +113,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
     if (_selectedThickness! > machineMaxThickness) {
       _showSnackBar(
-        '⚠️ $_selectedMachine maksimum $machineMaxThickness mm kesebilir!',
+        'âš ï¸ $_selectedMachine maksimum $machineMaxThickness mm kesebilir!',
         isError: true,
       );
       return false;
@@ -121,7 +121,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
     if (_selectedThickness! > materialMaxThickness) {
       _showSnackBar(
-        '⚠️ ${AppConfig.getMaterialDisplayName(_selectedMaterial!)} için maksimum kalınlık $materialMaxThickness mm!',
+        'âš ï¸ ${AppConfig.getMaterialDisplayName(_selectedMaterial!)} iÃ§in maksimum kalÄ±nlÄ±k $materialMaxThickness mm!',
         isError: true,
       );
       return false;
@@ -145,9 +145,9 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
       setState(() => _mlPrediction = response);
       _animationController.forward(from: 0);
-      _showSnackBar('✅ ML tahmini başarıyla alındı!');
+      _showSnackBar('âœ… ML tahmini baÅŸarÄ±yla alÄ±ndÄ±!');
     } catch (e) {
-      _showSnackBar('❌ ML tahmini alınamadı: $e', isError: true);
+      _showSnackBar('âŒ ML tahmini alÄ±namadÄ±: $e', isError: true);
     } finally {
       setState(() => _isLoading = false);
     }
@@ -168,9 +168,9 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
       setState(() => _geminiPrediction = response);
       _animationController.forward(from: 0);
-      _showSnackBar('✅ Gemini AI tahmini başarıyla alındı!');
+      _showSnackBar('âœ… Gemini AI tahmini baÅŸarÄ±yla alÄ±ndÄ±!');
     } catch (e) {
-      _showSnackBar('❌ Gemini AI tahmini alınamadı: $e', isError: true);
+      _showSnackBar('âŒ Gemini AI tahmini alÄ±namadÄ±: $e', isError: true);
     } finally {
       setState(() => _isLoading = false);
     }
@@ -202,9 +202,9 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
       });
 
       _animationController.forward(from: 0);
-      _showSnackBar('✅ Her iki tahmin de alındı!');
+      _showSnackBar('âœ… Her iki tahmin de alÄ±ndÄ±!');
     } catch (e) {
-      _showSnackBar('❌ Tahminler alınamadı: $e', isError: true);
+      _showSnackBar('âŒ Tahminler alÄ±namadÄ±: $e', isError: true);
     } finally {
       setState(() => _isLoading = false);
     }
@@ -427,7 +427,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
           ),
           SizedBox(height: isMobile ? 12 : 16),
           Text(
-            'Akıllı Parametre Tahmini',
+            'AkÄ±llÄ± Parametre Tahmini',
             style: TextStyle(
               fontSize: isMobile ? 24 : 32,
               fontWeight: FontWeight.bold,
@@ -437,7 +437,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
           ),
           SizedBox(height: isMobile ? 8 : 12),
           Text(
-            'Makinenizi ve malzemenizi seçin, AI en uygun ayarları önersin',
+            'Makinenizi ve malzemenizi seÃ§in, AI en uygun ayarlarÄ± Ã¶nersin',
             style: TextStyle(
               fontSize: isMobile ? 14 : 16,
               color: Colors.white.withOpacity(0.9),
@@ -477,8 +477,8 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                           Flexible(
                             child: Text(
                               isTrained
-                                  ? '🤖 Transfer Learning Modeli Aktif'
-                                  : '⚙️ Statik Algoritma Kullanılıyor',
+                                  ? 'ðŸ¤– Transfer Learning Modeli Aktif'
+                                  : 'âš™ï¸ Statik Algoritma KullanÄ±lÄ±yor',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: isMobile ? 13 : 14,
@@ -490,7 +490,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Veri tabanında $totalExperiments doğrulanmış deney',
+                        'Veri tabanÄ±nda $totalExperiments doÄŸrulanmÄ±ÅŸ deney',
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.9),
                           fontSize: isMobile ? 11 : 12,
@@ -500,7 +500,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
-                            '50+ deney gerekli (şu an: $totalExperiments)',
+                            '50+ deney gerekli (ÅŸu an: $totalExperiments)',
                             style: TextStyle(
                               color: Colors.orange.shade200,
                               fontSize: isMobile ? 10 : 11,
@@ -535,7 +535,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                   const SizedBox(width: 8),
                   Flexible(
                     child: Text(
-                      'ML API çevrimdışı - Gemini AI kullanılabilir',
+                      'ML API Ã§evrimdÄ±ÅŸÄ± - Gemini AI kullanÄ±labilir',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: isMobile ? 12 : 14,
@@ -591,14 +591,14 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Makine Seçimi',
+                        'Makine SeÃ§imi',
                         style: TextStyle(
                           fontSize: isMobile ? 18 : 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        'Kullandığınız lazer kesim makinesini seçin',
+                        'KullandÄ±ÄŸÄ±nÄ±z lazer kesim makinesini seÃ§in',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
@@ -681,9 +681,9 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               const Divider(),
               const SizedBox(height: 16),
 
-              // Lazer Gücü Seçimi
+              // Lazer GÃ¼cÃ¼ SeÃ§imi
               Text(
-                'Lazer Gücü',
+                'Lazer GÃ¼cÃ¼',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -737,7 +737,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Seçili: $_selectedMachine - ${_selectedPower!.toInt()}W',
+                          'SeÃ§ili: $_selectedMachine - ${_selectedPower!.toInt()}W',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.blue.shade900,
@@ -781,14 +781,14 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Malzeme Seçimi',
+                        'Malzeme SeÃ§imi',
                         style: TextStyle(
                           fontSize: isMobile ? 18 : 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        'Kesim yapacağınız malzemeyi seçin',
+                        'Kesim yapacaÄŸÄ±nÄ±z malzemeyi seÃ§in',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
@@ -851,7 +851,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                               setState(() {
                                 _selectedMaterial =
                                     selected ? materialKey : null;
-                                // Seçilen malzemeye uygun kalınlık sıfırla
+                                // SeÃ§ilen malzemeye uygun kalÄ±nlÄ±k sÄ±fÄ±rla
                                 if (selected) {
                                   final maxThickness =
                                       AppConfig.getMaxThicknessForMaterial(
@@ -885,11 +885,11 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               const Divider(),
               const SizedBox(height: 16),
 
-              // Kalınlık Seçimi
+              // KalÄ±nlÄ±k SeÃ§imi
               Row(
                 children: [
                   Text(
-                    'Kalınlık (mm)',
+                    'KalÄ±nlÄ±k (mm)',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -975,7 +975,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Seçili: ${AppConfig.getMaterialDisplayName(_selectedMaterial!)} - $_selectedThickness mm (${AppConfig.getMaterialDifficulty(_selectedMaterial!)})',
+                          'SeÃ§ili: ${AppConfig.getMaterialDisplayName(_selectedMaterial!)} - $_selectedThickness mm (${AppConfig.getMaterialDifficulty(_selectedMaterial!)})',
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.green.shade900,
@@ -1019,15 +1019,15 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'İşlem Tipleri',
+                        'Ä°ÅŸlem Tipleri',
                         style: TextStyle(
-                          // get_prediction_screen.dart devamı...
+                          // get_prediction_screen.dart devamÄ±...
                           fontSize: isMobile ? 18 : 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        'Yapılacak işlemleri seçin',
+                        'YapÄ±lacak iÅŸlemleri seÃ§in',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
@@ -1046,9 +1046,9 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               Icons.content_cut,
               Colors.red,
             ),
-            _buildProcessTile('Kazıma', 'engraving', Icons.draw, Colors.blue),
+            _buildProcessTile('KazÄ±ma', 'engraving', Icons.draw, Colors.blue),
             _buildProcessTile(
-              'Çizme',
+              'Ã‡izme',
               'scoring',
               Icons.border_style,
               Colors.orange,
@@ -1113,7 +1113,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Tahmin Kaynağı Seçin',
+              'Tahmin KaynaÄŸÄ± SeÃ§in',
               style: TextStyle(
                 fontSize: isMobile ? 16 : 18,
                 fontWeight: FontWeight.bold,
@@ -1144,8 +1144,8 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
 
             _buildPredictionButton(
               icon: Icons.compare_arrows,
-              label: 'Karşılaştır',
-              subtitle: 'Her ikisini gör',
+              label: 'KarÅŸÄ±laÅŸtÄ±r',
+              subtitle: 'Her ikisini gÃ¶r',
               color: Colors.blue,
               isLoading: _isLoading && _selectedPredictionSource == 'both',
               onPressed: _getComparativePredictions,
@@ -1228,7 +1228,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                 Icon(Icons.tips_and_updates, color: Colors.blue.shade700),
                 const SizedBox(width: 8),
                 Text(
-                  'Hızlı İpuçları',
+                  'HÄ±zlÄ± Ä°puÃ§larÄ±',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -1239,12 +1239,12 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
             ),
             const SizedBox(height: 12),
             _buildTipItem(
-              '✓ Her makine için önerilen güç değerlerini kullanın',
+              'âœ“ Her makine iÃ§in Ã¶nerilen gÃ¼Ã§ deÄŸerlerini kullanÄ±n',
             ),
-            _buildTipItem('✓ Malzeme kalınlığını doğru seçin'),
-            _buildTipItem('✓ İlk denemede düşük güçle başlayın'),
-            _buildTipItem('✓ Ahşap için 2-5mm kalınlık idealdir'),
-            _buildTipItem('⚠ Metal ve cam kesimi desteklenmez'),
+            _buildTipItem('âœ“ Malzeme kalÄ±nlÄ±ÄŸÄ±nÄ± doÄŸru seÃ§in'),
+            _buildTipItem('âœ“ Ä°lk denemede dÃ¼ÅŸÃ¼k gÃ¼Ã§le baÅŸlayÄ±n'),
+            _buildTipItem('âœ“ AhÅŸap iÃ§in 2-5mm kalÄ±nlÄ±k idealdir'),
+            _buildTipItem('âš  Metal ve cam kesimi desteklenmez'),
           ],
         ),
       ),
@@ -1283,7 +1283,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                 Expanded(
                   child: _buildSinglePredictionCard(
                     _mlPrediction!,
-                    '🤖 ML API',
+                    'ðŸ¤– ML API',
                     Colors.green,
                     isDark,
                     isMobile,
@@ -1294,7 +1294,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                 Expanded(
                   child: _buildSinglePredictionCard(
                     _geminiPrediction!,
-                    '🧠 Gemini AI',
+                    'ðŸ§  Gemini AI',
                     Colors.purple,
                     isDark,
                     isMobile,
@@ -1307,7 +1307,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               if (_mlPrediction != null)
                 _buildSinglePredictionCard(
                   _mlPrediction!,
-                  '🤖 ML API',
+                  'ðŸ¤– ML API',
                   Colors.green,
                   isDark,
                   isMobile,
@@ -1316,7 +1316,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               if (_geminiPrediction != null)
                 _buildSinglePredictionCard(
                   _geminiPrediction!,
-                  '🧠 Gemini AI',
+                  'ðŸ§  Gemini AI',
                   Colors.purple,
                   isDark,
                   isMobile,
@@ -1326,7 +1326,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
     } else if (_selectedPredictionSource == 'ml' && _mlPrediction != null) {
       return _buildSinglePredictionCard(
         _mlPrediction!,
-        '🤖 ML API Tahmini',
+        'ðŸ¤– ML API Tahmini',
         Colors.green,
         isDark,
         isMobile,
@@ -1335,7 +1335,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
         _geminiPrediction != null) {
       return _buildSinglePredictionCard(
         _geminiPrediction!,
-        '🧠 Gemini AI Tahmini',
+        'ðŸ§  Gemini AI Tahmini',
         Colors.purple,
         isDark,
         isMobile,
@@ -1400,7 +1400,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                         ),
                         Text(
                           result
-                              .getDataSourceDescription(), // ✅ Yeni metod kullanılıyor
+                              .getDataSourceDescription(), // âœ… Yeni metod kullanÄ±lÄ±yor
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey.shade600,
@@ -1435,7 +1435,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            'Önemli Uyarılar',
+                            'Ã–nemli UyarÄ±lar',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -1536,16 +1536,16 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Güven Skoru',
+                    'GÃ¼ven Skoru',
                     style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     percentage >= 80
-                        ? 'Yüksek Güvenilirlik'
+                        ? 'YÃ¼ksek GÃ¼venilirlik'
                         : percentage >= 60
-                        ? 'Orta Güvenilirlik'
-                        : 'Düşük Güvenilirlik',
+                        ? 'Orta GÃ¼venilirlik'
+                        : 'DÃ¼ÅŸÃ¼k GÃ¼venilirlik',
                     style: TextStyle(
                       fontSize: isMobile ? 16 : 18,
                       fontWeight: FontWeight.bold,
@@ -1594,7 +1594,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
           if (result.dataPointsUsed > 0) ...[
             const SizedBox(height: 8),
             Text(
-              '${result.dataPointsUsed} benzer deney kullanıldı',
+              '${result.dataPointsUsed} benzer deney kullanÄ±ldÄ±',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
           ],
@@ -1612,8 +1612,8 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
         entry.key == 'cutting'
             ? 'Kesme'
             : entry.key == 'engraving'
-            ? 'Kazıma'
-            : 'Çizme';
+            ? 'KazÄ±ma'
+            : 'Ã‡izme';
     ProcessParams params = entry.value;
 
     IconData icon =
@@ -1652,19 +1652,19 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildParamBadge(
-                'Güç',
+                'GÃ¼Ã§',
                 '${params.power.toStringAsFixed(1)}%',
                 color,
                 Icons.bolt,
               ),
               _buildParamBadge(
-                'Hız',
+                'HÄ±z',
                 '${params.speed.toStringAsFixed(0)}',
                 color,
                 Icons.speed,
               ),
               _buildParamBadge(
-                'Geçiş',
+                'GeÃ§iÅŸ',
                 '${params.passes}',
                 color,
                 Icons.repeat,
@@ -1736,7 +1736,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                   child: const Icon(Icons.info_outline, color: Colors.blue),
                 ),
                 const SizedBox(width: 12),
-                const Text('Nasıl Çalışır?'),
+                const Text('NasÄ±l Ã‡alÄ±ÅŸÄ±r?'),
               ],
             ),
             content: SingleChildScrollView(
@@ -1745,23 +1745,23 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildInfoSection(
-                    '1️⃣ Makine Seçin',
-                    'Kullandığınız diode lazer makinesini seçin. Her makine için uygun güç değerleri gösterilir.',
+                    '1ï¸âƒ£ Makine SeÃ§in',
+                    'KullandÄ±ÄŸÄ±nÄ±z diode lazer makinesini seÃ§in. Her makine iÃ§in uygun gÃ¼Ã§ deÄŸerleri gÃ¶sterilir.',
                   ),
                   const SizedBox(height: 16),
                   _buildInfoSection(
-                    '2️⃣ Malzeme Seçin',
-                    'Kesim yapacağınız malzemeyi seçin. Her malzeme için maksimum kalınlık bilgisi verilir.',
+                    '2ï¸âƒ£ Malzeme SeÃ§in',
+                    'Kesim yapacaÄŸÄ±nÄ±z malzemeyi seÃ§in. Her malzeme iÃ§in maksimum kalÄ±nlÄ±k bilgisi verilir.',
                   ),
                   const SizedBox(height: 16),
                   _buildInfoSection(
-                    '3️⃣ İşlem Seçin',
-                    'Kesme, kazıma veya çizme işlemlerinden birini veya birkaçını seçin.',
+                    '3ï¸âƒ£ Ä°ÅŸlem SeÃ§in',
+                    'Kesme, kazÄ±ma veya Ã§izme iÅŸlemlerinden birini veya birkaÃ§Ä±nÄ± seÃ§in.',
                   ),
                   const SizedBox(height: 16),
                   _buildInfoSection(
-                    '4️⃣ Tahmin Alın',
-                    'ML API topluluk verilerinden, Gemini AI yapay zekadan önerileri alır. Karşılaştırma ile her ikisini görürsünüz.',
+                    '4ï¸âƒ£ Tahmin AlÄ±n',
+                    'ML API topluluk verilerinden, Gemini AI yapay zekadan Ã¶nerileri alÄ±r. KarÅŸÄ±laÅŸtÄ±rma ile her ikisini gÃ¶rÃ¼rsÃ¼nÃ¼z.',
                   ),
                   const Divider(height: 32),
                   Container(
@@ -1783,7 +1783,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'Önemli Uyarılar',
+                              'Ã–nemli UyarÄ±lar',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.orange.shade900,
@@ -1793,10 +1793,10 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '• İlk denemede düşük güçle başlayın\n'
-                          '• Metal ve cam kesimi desteklenmez\n'
-                          '• 8mm üzeri kalınlıklar zordur\n'
-                          '• Her zaman test kesimi yapın',
+                          'â€¢ Ä°lk denemede dÃ¼ÅŸÃ¼k gÃ¼Ã§le baÅŸlayÄ±n\n'
+                          'â€¢ Metal ve cam kesimi desteklenmez\n'
+                          'â€¢ 8mm Ã¼zeri kalÄ±nlÄ±klar zordur\n'
+                          'â€¢ Her zaman test kesimi yapÄ±n',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.orange.shade900,
@@ -1811,7 +1811,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Anladım', style: TextStyle(fontSize: 16)),
+                child: const Text('AnladÄ±m', style: TextStyle(fontSize: 16)),
               ),
             ],
           ),

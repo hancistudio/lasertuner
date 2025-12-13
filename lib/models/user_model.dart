@@ -26,7 +26,7 @@ class UserModel {
   }
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
-    // createdAt'i parse ederken hem Timestamp hem String formatını destekle
+    // createdAt'i parse ederken hem Timestamp hem String formatÄ±nÄ± destekle
     DateTime parsedCreatedAt;
 
     if (map['createdAt'] is Timestamp) {
@@ -46,7 +46,7 @@ class UserModel {
     );
   }
 
-  // copyWith metodu - kullanıcı bilgilerini güncellemek için
+  // copyWith metodu - kullanÄ±cÄ± bilgilerini gÃ¼ncellemek iÃ§in
   UserModel copyWith({
     String? uid,
     String? email,

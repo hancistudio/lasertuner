@@ -6,22 +6,17 @@ python-dotenv==1.0.0
 
 # Numerical Computing
 numpy==1.24.3
-scikit-learn==1.3.2
 
-# Firebase Admin SDK
+# Firebase Admin SDK (includes Firestore + Storage)
 firebase-admin==6.2.0
+
+# Google Cloud Dependencies
 google-cloud-firestore==2.13.1
 google-cloud-storage==2.10.0
 google-auth==2.23.4
 
-# TensorFlow for Transfer Learning
+# TensorFlow for Transfer Learning (lightweight CPU version)
 tensorflow-cpu==2.15.0
+
+# Protobuf compatibility fix
 protobuf==4.23.4
-
-# ✅ Image Processing (UPDATED)
-Pillow==10.1.0
-opencv-python-headless==4.8.1.78
-requests==2.31.0  # For downloading images from URLs
-
-# ✅ Scheduled Jobs (UPDATED)
-APScheduler==3.10.4

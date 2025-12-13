@@ -21,7 +21,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _handleAuth() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showSnackBar('Lütfen tüm alanları doldurun');
+      _showSnackBar('LÃ¼tfen tÃ¼m alanlarÄ± doldurun');
       return;
     }
 
@@ -76,7 +76,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Logo ve başlık
+                    // Logo ve baÅŸlÄ±k
                     const Icon(Icons.flash_on, size: 64, color: Colors.orange),
                     const SizedBox(height: 16),
                     Text(
@@ -86,7 +86,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _isLogin ? 'Giriş Yap' : 'Kayıt Ol',
+                      _isLogin ? 'GiriÅŸ Yap' : 'KayÄ±t Ol',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 32),
@@ -99,19 +99,19 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Şifre
+                    // Åžifre
                     CustomTextField(
                       controller: _passwordController,
-                      label: 'Şifre',
+                      label: 'Åžifre',
                       obscureText: true,
                     ),
                     const SizedBox(height: 24),
 
-                    // Giriş/Kayıt butonu
+                    // GiriÅŸ/KayÄ±t butonu
                     SizedBox(
                       width: double.infinity,
                       child: CustomButton(
-                        text: _isLogin ? 'Giriş Yap' : 'Kayıt Ol',
+                        text: _isLogin ? 'GiriÅŸ Yap' : 'KayÄ±t Ol',
                         onPressed: _handleAuth,
                         isLoading: _isLoading,
                       ),
@@ -125,8 +125,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       },
                       child: Text(
                         _isLogin
-                            ? 'Hesabın yok mu? Kayıt ol'
-                            : 'Zaten hesabın var mı? Giriş yap',
+                            ? 'HesabÄ±n yok mu? KayÄ±t ol'
+                            : 'Zaten hesabÄ±n var mÄ±? GiriÅŸ yap',
                       ),
                     ),
                   ],

@@ -10,25 +10,25 @@ class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  // ========== EXPERIMENT İŞLEMLERİ ==========
+  // ========== EXPERIMENT Ä°ÅžLEMLERÄ° ==========
 
-  /// Experiment ekle (iki fotoğraf ile)
+  /// Experiment ekle (iki fotoÄŸraf ile)
   Future<void> addExperiment(
     ExperimentModel experiment,
     XFile imageFile, {
     XFile? imageFile2,
   }) async {
     try {
-      // 1. İlk fotoğrafı Storage'a yükle
+      // 1. Ä°lk fotoÄŸrafÄ± Storage'a yÃ¼kle
       String imageUrl = await _uploadImage(imageFile, 'experiments');
 
-      // 2. İkinci fotoğraf varsa yükle
+      // 2. Ä°kinci fotoÄŸraf varsa yÃ¼kle
       String imageUrl2 = '';
       if (imageFile2 != null) {
         imageUrl2 = await _uploadImage(imageFile2, 'experiments');
       }
 
-      // 3. Experiment'i photoUrl'ler ile güncelle
+      // 3. Experiment'i photoUrl'ler ile gÃ¼ncelle
       ExperimentModel updatedExperiment = experiment.copyWith(
         photoUrl: imageUrl,
         photoUrl2: imageUrl2,
@@ -39,22 +39,22 @@ class FirestoreService {
           .collection('experiments')
           .add(updatedExperiment.toFirestore());
     } catch (e) {
-      print('addExperiment hatası: $e');
+      print('addExperiment hatasÄ±: $e');
       rethrow;
     }
   }
 
-  /// Experiment ekle (fotoğraf OLMADAN - harici veri import için)
+  /// Experiment ekle (fotoÄŸraf OLMADAN - harici veri import iÃ§in)
   Future<void> addExperimentWithoutImage(ExperimentModel experiment) async {
     try {
       await _firestore.collection('experiments').add(experiment.toFirestore());
     } catch (e) {
-      print('addExperimentWithoutImage hatası: $e');
+      print('addExperimentWithoutImage hatasÄ±: $e');
       rethrow;
     }
   }
 
-  /// Tüm experiments'leri getir
+  /// TÃ¼m experiments'leri getir
   Stream<List<ExperimentModel>> getExperiments() {
     return _firestore
         .collection('experiments')
@@ -67,7 +67,7 @@ class FirestoreService {
         });
   }
 
-  /// Kullanıcıya ait experiments'leri getir
+  /// KullanÄ±cÄ±ya ait experiments'leri getir
   Stream<List<ExperimentModel>> getUserExperiments(String userId) {
     return _firestore
         .collection('experiments')
@@ -81,7 +81,7 @@ class FirestoreService {
         });
   }
 
-  /// Araştırmacının eklediği verileri getir
+  /// AraÅŸtÄ±rmacÄ±nÄ±n eklediÄŸi verileri getir
   Stream<List<ExperimentModel>> getResearcherExperiments(String userId) {
     return _firestore
         .collection('experiments')
@@ -101,7 +101,7 @@ class FirestoreService {
     return _firestore.collection('experiments').doc(experimentId).snapshots();
   }
 
-  // ========== LASER DATA İŞLEMLERİ ==========
+  // ========== LASER DATA Ä°ÅžLEMLERÄ° ==========
 
   Future<void> addLaserData(LaserDataModel laserData, XFile imageFile) async {
     try {
@@ -109,7 +109,7 @@ class FirestoreService {
       LaserDataModel updatedData = laserData.copyWith(imageUrl: imageUrl);
       await _firestore.collection('laser_data').add(updatedData.toFirestore());
     } catch (e) {
-      print('addLaserData hatası: $e');
+      print('addLaserData hatasÄ±: $e');
       rethrow;
     }
   }
@@ -162,7 +162,7 @@ class FirestoreService {
       String downloadUrl = await ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      print('_uploadImage hatası: $e');
+      print('_uploadImage hatasÄ±: $e');
       rethrow;
     }
   }
@@ -186,7 +186,7 @@ class FirestoreService {
         });
       }
     } catch (e) {
-      print('updateUserReputation hatası: $e');
+      print('updateUserReputation hatasÄ±: $e');
       rethrow;
     }
   }
@@ -199,7 +199,7 @@ class FirestoreService {
       String field = isUpvote ? 'upvotes' : 'downvotes';
       await experimentRef.update({field: FieldValue.increment(1)});
     } catch (e) {
-      print('voteExperiment hatası: $e');
+      print('voteExperiment hatasÄ±: $e');
       rethrow;
     }
   }
@@ -212,7 +212,7 @@ class FirestoreService {
       String field = isUpvote ? 'upvotes' : 'downvotes';
       await dataRef.update({field: FieldValue.increment(1)});
     } catch (e) {
-      print('voteLaserData hatası: $e');
+      print('voteLaserData hatasÄ±: $e');
       rethrow;
     }
   }
@@ -299,7 +299,7 @@ class FirestoreService {
               .get();
 
       if (existingVote.docs.isNotEmpty) {
-        throw Exception('Bu deneye zaten oy kullandınız!');
+        throw Exception('Bu deneye zaten oy kullandÄ±nÄ±z!');
       }
 
       await _firestore.collection('experiment_votes').add({
@@ -330,7 +330,7 @@ class FirestoreService {
               .get();
 
       if (existingVote.docs.isEmpty) {
-        throw Exception('Değiştirilecek oy bulunamadı!');
+        throw Exception('DeÄŸiÅŸtirilecek oy bulunamadÄ±!');
       }
 
       await _firestore

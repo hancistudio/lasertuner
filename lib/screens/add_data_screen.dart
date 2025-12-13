@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
@@ -20,13 +22,13 @@ class _AddDataScreenState extends State<AddDataScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   final ImagePicker _imagePicker = ImagePicker();
 
-  // Seçili değerler
+  // SeÃ§ili deÄŸerler
   String? _selectedMachine;
   double? _selectedPower;
   String? _selectedMaterial;
   double? _selectedThickness;
 
-  // Fotoğraflar
+  // FotoÄŸraflar
   XFile? _selectedImageFile;
   Uint8List? _webImage;
   XFile? _selectedImageFile2;
@@ -89,39 +91,39 @@ class _AddDataScreenState extends State<AddDataScreen> {
         }
       }
     } catch (e) {
-      _showSnackBar('Resim seçme hatası: $e');
+      _showSnackBar('Resim seÃ§me hatasÄ±: $e');
     }
   }
 
   bool _validateInputs() {
     if (_selectedMachine == null) {
-      _showSnackBar('⚠️ Lütfen makine seçin');
+      _showSnackBar('âš ï¸ LÃ¼tfen makine seÃ§in');
       return false;
     }
     if (_selectedPower == null) {
-      _showSnackBar('⚠️ Lütfen lazer gücü seçin');
+      _showSnackBar('âš ï¸ LÃ¼tfen lazer gÃ¼cÃ¼ seÃ§in');
       return false;
     }
     if (_selectedMaterial == null) {
-      _showSnackBar('⚠️ Lütfen malzeme seçin');
+      _showSnackBar('âš ï¸ LÃ¼tfen malzeme seÃ§in');
       return false;
     }
     if (_selectedThickness == null) {
-      _showSnackBar('⚠️ Lütfen kalınlık seçin');
+      _showSnackBar('âš ï¸ LÃ¼tfen kalÄ±nlÄ±k seÃ§in');
       return false;
     }
 
     if (!_selectedProcesses.containsValue(true)) {
-      _showSnackBar('⚠️ En az bir işlem tipi seçin');
+      _showSnackBar('âš ï¸ En az bir iÅŸlem tipi seÃ§in');
       return false;
     }
 
     if (_selectedImageFile == null) {
-      _showSnackBar('⚠️ Lütfen en az bir fotoğraf yükleyin');
+      _showSnackBar('âš ï¸ LÃ¼tfen en az bir fotoÄŸraf yÃ¼kleyin');
       return false;
     }
 
-    // Process parametreleri kontrolü
+    // Process parametreleri kontrolÃ¼
     for (var entry in _selectedProcesses.entries) {
       if (entry.value) {
         final controllers = _processControllers[entry.key]!;
@@ -129,7 +131,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
             controllers['speed']!.text.isEmpty ||
             controllers['passes']!.text.isEmpty) {
           _showSnackBar(
-            '⚠️ ${_getProcessName(entry.key)} için tüm parametreleri girin',
+            'âš ï¸ ${_getProcessName(entry.key)} iÃ§in tÃ¼m parametreleri girin',
           );
           return false;
         }
@@ -139,67 +141,59 @@ class _AddDataScreenState extends State<AddDataScreen> {
     return true;
   }
 
- Future<void> _submitData() async {
-  if (!_validateInputs()) return;
+  Future<void> _submitData() async {
+    if (!_validateInputs()) return;
 
-  setState(() => _isLoading = true);
+    setState(() => _isLoading = true);
 
-  try {
-    Map<String, ProcessParams> processes = {};
-    Map<String, int> qualityScores = {};
+    try {
+      Map<String, ProcessParams> processes = {};
+      Map<String, int> qualityScores = {};
 
-    _selectedProcesses.forEach((processType, isSelected) {
-      if (isSelected) {
-        final controllers = _processControllers[processType]!;
-        processes[processType] = ProcessParams(
-          power: double.parse(controllers['power']!.text),
-          speed: double.parse(controllers['speed']!.text),
-          passes: int.parse(controllers['passes']!.text),
-        );
-        qualityScores[processType] = _qualityScores[processType]!.toInt();
-      }
-    });
+      _selectedProcesses.forEach((processType, isSelected) {
+        if (isSelected) {
+          final controllers = _processControllers[processType]!;
+          processes[processType] = ProcessParams(
+            power: double.parse(controllers['power']!.text),
+            speed: double.parse(controllers['speed']!.text),
+            passes: int.parse(controllers['passes']!.text),
+          );
+          qualityScores[processType] = _qualityScores[processType]!.toInt();
+        }
+      });
 
-    // ✅ Material display name'i backend-safe key'e çevir
-    final backendMaterialKey = AppConfig.getMaterialBackendKey(_selectedMaterial!);
-    final displayName = AppConfig.getMaterialDisplayName(_selectedMaterial!);
+      ExperimentModel experiment = ExperimentModel(
+        id: '',
+        userId: widget.userId,
+        machineBrand: _selectedMachine!,
+        laserPower: _selectedPower!,
+        materialType: AppConfig.getMaterialDisplayName(_selectedMaterial!),
+        materialThickness: _selectedThickness!,
+        processes: processes,
+        photoUrl: '',
+        photoUrl2: '',
+        qualityScores: qualityScores,
+        dataSource: 'user',
+        verificationStatus: 'pending',
+        createdAt: DateTime.now(),
+      );
 
-    print('🔄 Material conversion:');
-    print('   Selected key: $_selectedMaterial');
-    print('   Display name: $displayName');
-    print('   Backend key: $backendMaterialKey');
+      await _firestoreService.addExperiment(
+        experiment,
+        _selectedImageFile!,
+        imageFile2: _selectedImageFile2,
+      );
 
-    ExperimentModel experiment = ExperimentModel(
-      id: '',
-      userId: widget.userId,
-      machineBrand: _selectedMachine!,
-      laserPower: _selectedPower!,
-      materialType: displayName, // ✅ Display name Firebase'e kaydedilir
-      materialThickness: _selectedThickness!,
-      processes: processes,
-      photoUrl: '',
-      photoUrl2: '',
-      qualityScores: qualityScores,
-      dataSource: 'user',
-      verificationStatus: 'pending',
-      createdAt: DateTime.now(),
-    );
+      _showSnackBar('âœ… Veri baÅŸarÄ±yla eklendi!');
 
-    await _firestoreService.addExperiment(
-      experiment,
-      _selectedImageFile!,
-      imageFile2: _selectedImageFile2,
-    );
-
-    _showSnackBar('✅ Veri başarıyla eklendi!');
-
-    if (mounted) Navigator.pop(context);
-  } catch (e) {
-    _showSnackBar('❌ Hata: ${e.toString()}');
-  } finally {
-    if (mounted) setState(() => _isLoading = false);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      _showSnackBar('âŒ Hata: ${e.toString()}');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
-}
+
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
@@ -211,9 +205,9 @@ class _AddDataScreenState extends State<AddDataScreen> {
       case 'cutting':
         return 'Kesme';
       case 'engraving':
-        return 'Kazıma';
+        return 'KazÄ±ma';
       case 'scoring':
-        return 'Çizme';
+        return 'Ã‡izme';
       default:
         return key;
     }
@@ -227,7 +221,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Veri Ekle', style: TextStyle(color: Colors.white)),
+        title: Text('Veri Ekle', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.blue,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -239,7 +233,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Bilgilendirme kartı
+                // Bilgilendirme kartÄ±
                 Card(
                   color: Colors.blue.shade50,
                   child: Padding(
@@ -250,7 +244,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            'Deneyimlediğiniz başarılı kesim parametrelerini topluluğa ekleyin. Veriler onaylandıktan sonra tahmin sisteminde kullanılacak.',
+                            'DeneyimlediÄŸiniz baÅŸarÄ±lÄ± kesim parametrelerini topluluÄŸa ekleyin. Veriler onaylandÄ±ktan sonra tahmin sisteminde kullanÄ±lacak.',
                             style: TextStyle(
                               color: Colors.blue.shade900,
                               fontSize: 13,
@@ -263,25 +257,25 @@ class _AddDataScreenState extends State<AddDataScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Makine seçimi
+                // Makine seÃ§imi
                 _buildMachineSection(isDark, isMobile),
                 const SizedBox(height: 16),
 
-                // Malzeme seçimi
+                // Malzeme seÃ§imi
                 _buildMaterialSection(isDark, isMobile),
                 const SizedBox(height: 16),
 
-                // İşlem tipleri
+                // Ä°ÅŸlem tipleri
                 _buildProcessSection(isDark, isMobile),
                 const SizedBox(height: 16),
 
-                // Fotoğraflar
+                // FotoÄŸraflar
                 _buildPhotoSection(isDark, isMobile),
                 const SizedBox(height: 24),
 
-                // Gönder butonu
+                // GÃ¶nder butonu
                 CustomButton(
-                  text: 'Veriyi Gönder',
+                  text: 'Veriyi GÃ¶nder',
                   onPressed: _submitData,
                   isLoading: _isLoading,
                 ),
@@ -312,7 +306,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Makine seçimi
+            // Makine seÃ§imi
             Text(
               'Makine Modeli',
               style: TextStyle(
@@ -363,9 +357,9 @@ class _AddDataScreenState extends State<AddDataScreen> {
               const Divider(),
               const SizedBox(height: 16),
 
-              // Güç seçimi
+              // GÃ¼Ã§ seÃ§imi
               Text(
-                'Lazer Gücü',
+                'Lazer GÃ¼cÃ¼',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -494,11 +488,11 @@ class _AddDataScreenState extends State<AddDataScreen> {
               const Divider(),
               const SizedBox(height: 16),
 
-              // Kalınlık seçimi
+              // KalÄ±nlÄ±k seÃ§imi
               Row(
                 children: [
                   Text(
-                    'Kalınlık (mm)',
+                    'KalÄ±nlÄ±k (mm)',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -582,14 +576,14 @@ class _AddDataScreenState extends State<AddDataScreen> {
                 Icon(Icons.settings, color: Colors.purple),
                 const SizedBox(width: 8),
                 Text(
-                  'İşlem Parametreleri',
+                  'Ä°ÅŸlem Parametreleri',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              'Kullandığınız parametreleri girin',
+              'KullandÄ±ÄŸÄ±nÄ±z parametreleri girin',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 16),
@@ -601,11 +595,16 @@ class _AddDataScreenState extends State<AddDataScreen> {
               Colors.red,
             ),
             const SizedBox(height: 12),
-            _buildProcessInputs('engraving', 'Kazıma', Icons.draw, Colors.blue),
+            _buildProcessInputs(
+              'engraving',
+              'KazÄ±ma',
+              Icons.draw,
+              Colors.blue,
+            ),
             const SizedBox(height: 12),
             _buildProcessInputs(
               'scoring',
-              'Çizme',
+              'Ã‡izme',
               Icons.border_style,
               Colors.orange,
             ),
@@ -657,7 +656,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
                         child: TextField(
                           controller: controllers['power']!,
                           decoration: InputDecoration(
-                            labelText: 'Güç (%)',
+                            labelText: 'GÃ¼Ã§ (%)',
                             hintText: '0-100',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -675,7 +674,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
                         child: TextField(
                           controller: controllers['speed']!,
                           decoration: InputDecoration(
-                            labelText: 'Hız (mm/s)',
+                            labelText: 'HÄ±z (mm/s)',
                             hintText: '50-500',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -693,7 +692,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
                         child: TextField(
                           controller: controllers['passes']!,
                           decoration: InputDecoration(
-                            labelText: 'Geçiş',
+                            labelText: 'GeÃ§iÅŸ',
                             hintText: '1-20',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
@@ -747,20 +746,20 @@ class _AddDataScreenState extends State<AddDataScreen> {
                 Icon(Icons.photo_library, color: Colors.blue),
                 const SizedBox(width: 8),
                 Text(
-                  'Fotoğraflar',
+                  'FotoÄŸraflar',
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              'En az 1, en fazla 2 fotoğraf ekleyebilirsiniz.',
+              'En az 1, en fazla 2 fotoÄŸraf ekleyebilirsiniz.',
               style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
             ),
             const SizedBox(height: 16),
 
             _buildPhotoUpload(
-              title: '1. Fotoğraf (Zorunlu)',
+              title: '1. FotoÄŸraf (Zorunlu)',
               imageFile: _selectedImageFile,
               webImage: _webImage,
               onPick: () => _pickImage(isSecond: false),
@@ -776,7 +775,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
             const SizedBox(height: 16),
 
             _buildPhotoUpload(
-              title: '2. Fotoğraf (İsteğe Bağlı)',
+              title: '2. FotoÄŸraf (Ä°steÄŸe BaÄŸlÄ±)',
               imageFile: _selectedImageFile2,
               webImage: _webImage2,
               onPick: () => _pickImage(isSecond: true),
@@ -899,7 +898,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
             OutlinedButton.icon(
               onPressed: onPick,
               icon: const Icon(Icons.refresh),
-              label: const Text('Değiştir'),
+              label: const Text('DeÄŸiÅŸtir'),
             ),
           ] else
             GestureDetector(
@@ -924,7 +923,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Fotoğraf Ekle',
+                        'FotoÄŸraf Ekle',
                         style: TextStyle(
                           color: Colors.blue,
                           fontWeight: FontWeight.w500,

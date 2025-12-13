@@ -1,5 +1,5 @@
 class AppConfig {
-  // Admin şifresi
+  // Admin ÅŸifresi
   static const String ADMIN_PASSWORD = 'laser2025';
 
   // ML API URL
@@ -15,49 +15,49 @@ class AppConfig {
   static const double MIN_THICKNESS = 1.0;
   static const double MAX_THICKNESS = 10.0;
 
-  // Reputation kuralları
+  // Reputation kurallarÄ±
   static const int REPUTATION_ADD_DATA = 5;
   static const int REPUTATION_UPVOTE = 2;
   static const int REPUTATION_DOWNVOTE = -1;
   static const int REPUTATION_GOLD_STANDARD = 20;
 
-  // ===== DESTEKLENMEYEcek MALZEMELER (Uyarı için) =====
+  // ===== DESTEKLENMEYEcek MALZEMELER (UyarÄ± iÃ§in) =====
   static const List<String> UNSUPPORTED_MATERIALS = [
     'Metal',
-    'Çelik',
-    'Paslanmaz Çelik',
-    'Bakır',
-    'Pirinç',
+    'Ã‡elik',
+    'Paslanmaz Ã‡elik',
+    'BakÄ±r',
+    'PirinÃ§',
     'Cam',
     'Seramik',
-    'Taş',
+    'TaÅŸ',
     'Mermer',
     'Granit',
   ];
 
   // ===== DESTEKLENEN MALZEMELER =====
   static const List<String> SUPPORTED_MATERIALS = [
-    'Ahşap',
+    'AhÅŸap',
     'MDF',
     'Kontrplak',
     'Karton',
     'Deri',
-    'Keçe',
-    'Kumaş',
-    'Kağıt',
-    'Köpük',
+    'KeÃ§e',
+    'KumaÅŸ',
+    'KaÄŸÄ±t',
+    'KÃ¶pÃ¼k',
     'Mantar',
     'Bambu',
   ];
 
-  // ===== DESTEKLENEN MAKİNE MODELLERİ =====
+  // ===== DESTEKLENEN MAKÄ°NE MODELLERÄ° =====
   static const List<Map<String, dynamic>> SUPPORTED_MACHINES = [
     {
       'name': 'xTool D1 Pro',
       'brand': 'xTool',
       'defaultPower': 20.0,
       'powerRange': [5.0, 10.0, 20.0, 40.0],
-      'icon': '🔥',
+      'icon': 'ðŸ”¥',
       'maxThickness': 8.0,
     },
     {
@@ -65,7 +65,7 @@ class AppConfig {
       'brand': 'Sculpfun',
       'defaultPower': 33.0,
       'powerRange': [10.0, 20.0, 33.0],
-      'icon': '⚡',
+      'icon': 'âš¡',
       'maxThickness': 8.0,
     },
     {
@@ -73,7 +73,7 @@ class AppConfig {
       'brand': 'xTool',
       'defaultPower': 40.0,
       'powerRange': [10.0, 20.0, 40.0],
-      'icon': '💎',
+      'icon': 'ðŸ’Ž',
       'maxThickness': 10.0,
     },
     {
@@ -81,7 +81,7 @@ class AppConfig {
       'brand': 'Ortur',
       'defaultPower': 10.0,
       'powerRange': [5.0, 10.0, 20.0],
-      'icon': '🎯',
+      'icon': 'ðŸŽ¯',
       'maxThickness': 6.0,
     },
     {
@@ -89,7 +89,7 @@ class AppConfig {
       'brand': 'Atomstack',
       'defaultPower': 20.0,
       'powerRange': [5.0, 10.0, 20.0],
-      'icon': '🚀',
+      'icon': 'ðŸš€',
       'maxThickness': 8.0,
     },
     {
@@ -97,7 +97,7 @@ class AppConfig {
       'brand': 'Sculpfun',
       'defaultPower': 33.0,
       'powerRange': [10.0, 20.0, 33.0],
-      'icon': '💪',
+      'icon': 'ðŸ’ª',
       'maxThickness': 8.0,
     },
     {
@@ -105,7 +105,7 @@ class AppConfig {
       'brand': 'LaserPecker',
       'defaultPower': 10.0,
       'powerRange': [2.0, 5.0, 10.0],
-      'icon': '🌟',
+      'icon': 'ðŸŒŸ',
       'maxThickness': 5.0,
     },
     {
@@ -113,7 +113,7 @@ class AppConfig {
       'brand': 'Longer',
       'defaultPower': 40.0,
       'powerRange': [10.0, 20.0, 40.0],
-      'icon': '🦅',
+      'icon': 'ðŸ¦…',
       'maxThickness': 10.0,
     },
     {
@@ -121,7 +121,7 @@ class AppConfig {
       'brand': 'xTool',
       'defaultPower': 20.0,
       'powerRange': [5.0, 10.0, 20.0],
-      'icon': '✨',
+      'icon': 'âœ¨',
       'maxThickness': 6.0,
     },
     {
@@ -129,107 +129,135 @@ class AppConfig {
       'brand': 'TwoTrees',
       'defaultPower': 20.0,
       'powerRange': [5.0, 10.0, 20.0, 40.0],
-      'icon': '🌲',
+      'icon': 'ðŸŒ²',
       'maxThickness': 8.0,
     },
     {
-      'name': 'Diğer',
+      'name': 'DiÄŸer',
       'brand': 'Custom',
       'defaultPower': 20.0,
       'powerRange': [2.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 33.0, 35.0, 40.0],
-      'icon': '🔧',
+      'icon': 'ðŸ”§',
       'maxThickness': 10.0,
     },
   ];
 
-  // ===== STANDART GÜÇ DEĞERLERİ (2-40W) =====
+  // ===== STANDART GÃœÃ‡ DEÄžERLERÄ° (2-40W) =====
   static const List<double> STANDARD_POWER_VALUES = [
-    2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 25.0, 30.0, 33.0, 35.0, 40.0,
+    2.0,
+    3.0,
+    5.0,
+    7.0,
+    10.0,
+    15.0,
+    20.0,
+    25.0,
+    30.0,
+    33.0,
+    35.0,
+    40.0,
   ];
 
-  // ===== KALINLIK DEĞERLERİ (1-10mm) =====
+  // ===== KALINLIK DEÄžERLERÄ° (1-10mm) =====
   static const List<double> THICKNESS_VALUES = [
-    1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5,
-    6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0,
+    1.0,
+    1.5,
+    2.0,
+    2.5,
+    3.0,
+    3.5,
+    4.0,
+    4.5,
+    5.0,
+    5.5,
+    6.0,
+    6.5,
+    7.0,
+    7.5,
+    8.0,
+    8.5,
+    9.0,
+    9.5,
+    10.0,
   ];
 
-  // ===== MALZEME KATEGORİLERİ =====
+  // ===== MALZEME KATEGORÄ°LERÄ° =====
   static const Map<String, List<Map<String, dynamic>>> MATERIAL_CATEGORIES = {
-    'Ahşap Ürünleri': [
+    'AhÅŸap ÃœrÃ¼nleri': [
       {
-        'name': 'Ahşap',
+        'name': 'AhÅŸap',
         'key': 'ahsap',
-        'icon': '🪵',
+        'icon': 'ðŸªµ',
         'maxThickness': 8.0,
         'difficulty': 'Orta',
       },
       {
         'name': 'Kontrplak',
         'key': 'kontrplak',
-        'icon': '🪵',
+        'icon': 'ðŸªµ',
         'maxThickness': 10.0,
         'difficulty': 'Orta',
       },
       {
         'name': 'MDF',
         'key': 'mdf',
-        'icon': '📦',
+        'icon': 'ðŸ“¦',
         'maxThickness': 8.0,
         'difficulty': 'Orta',
       },
       {
-        'name': 'Balsa Ağacı',
+        'name': 'Balsa AÄŸacÄ±',
         'key': 'balsa',
-        'icon': '🌳',
+        'icon': 'ðŸŒ³',
         'maxThickness': 10.0,
         'difficulty': 'Kolay',
       },
       {
         'name': 'Bambu',
         'key': 'bambu',
-        'icon': '🎋',
+        'icon': 'ðŸŽ‹',
         'maxThickness': 8.0,
         'difficulty': 'Orta',
       },
       {
-        'name': 'Kayın',
+        'name': 'KayÄ±n',
         'key': 'kayin',
-        'icon': '🌲',
+        'icon': 'ðŸŒ²',
         'maxThickness': 6.0,
         'difficulty': 'Zor',
       },
       {
-        'name': 'Meşe',
+        'name': 'MeÅŸe',
         'key': 'mese',
-        'icon': '🌳',
+        'icon': 'ðŸŒ³',
         'maxThickness': 5.0,
         'difficulty': 'Zor',
       },
       {
         'name': 'Ceviz',
         'key': 'ceviz',
-        'icon': '🌰',
+        'icon': 'ðŸŒ°',
         'maxThickness': 5.0,
         'difficulty': 'Zor',
       },
       {
-        'name': 'Akçaağaç',
+        'name': 'AkÃ§aaÄŸaÃ§',
         'key': 'akcaagac',
-        'icon': '🍁',
+        'icon': 'ðŸ',
         'maxThickness': 5.0,
         'difficulty': 'Zor',
       },
       {
-        'name': 'Huş Ağacı',
+        'name': 'HuÅŸ AÄŸacÄ±',
         'key': 'hus',
-        'icon': '🌲',
+        'icon': 'ðŸŒ²',
         'maxThickness': 6.0,
         'difficulty': 'Orta',
       },
       {
-        'name': 'Çam',
+        'name': 'Ã‡am',
         'key': 'cam',
-        'icon': '🌲',
+        'icon': 'ðŸŒ²',
         'maxThickness': 6.0,
         'difficulty': 'Orta',
       },
@@ -238,42 +266,42 @@ class AppConfig {
       {
         'name': 'Deri',
         'key': 'deri',
-        'icon': '🧥',
+        'icon': 'ðŸ§¥',
         'maxThickness': 5.0,
         'difficulty': 'Kolay',
       },
       {
         'name': 'Karton',
         'key': 'karton',
-        'icon': '📦',
+        'icon': 'ðŸ“¦',
         'maxThickness': 5.0,
-        'difficulty': 'Çok Kolay',
+        'difficulty': 'Ã‡ok Kolay',
       },
       {
-        'name': 'Kağıt',
+        'name': 'KaÄŸÄ±t',
         'key': 'kagit',
-        'icon': '📄',
+        'icon': 'ðŸ“„',
         'maxThickness': 2.0,
-        'difficulty': 'Çok Kolay',
+        'difficulty': 'Ã‡ok Kolay',
       },
       {
-        'name': 'Kumaş',
+        'name': 'KumaÅŸ',
         'key': 'kumas',
-        'icon': '🧵',
+        'icon': 'ðŸ§µ',
         'maxThickness': 3.0,
-        'difficulty': 'Çok Kolay',
+        'difficulty': 'Ã‡ok Kolay',
       },
       {
-        'name': 'Keçe',
+        'name': 'KeÃ§e',
         'key': 'kece',
-        'icon': '🧶',
+        'icon': 'ðŸ§¶',
         'maxThickness': 4.0,
-        'difficulty': 'Çok Kolay',
+        'difficulty': 'Ã‡ok Kolay',
       },
       {
         'name': 'Mantar',
         'key': 'mantar',
-        'icon': '🍄',
+        'icon': 'ðŸ„',
         'maxThickness': 6.0,
         'difficulty': 'Kolay',
       },
@@ -282,41 +310,41 @@ class AppConfig {
       {
         'name': 'Akrilik',
         'key': 'akrilik',
-        'icon': '💎',
+        'icon': 'ðŸ’Ž',
         'maxThickness': 3.0,
         'difficulty': 'Orta',
-        'warning': 'Sadece bazı diode lazerler destekler',
+        'warning': 'Sadece bazÄ± diode lazerler destekler',
       },
       {
         'name': 'Lastik',
         'key': 'lastik',
-        'icon': '⚫',
+        'icon': 'âš«',
         'maxThickness': 5.0,
         'difficulty': 'Orta',
       },
       {
-        'name': 'Köpük',
+        'name': 'KÃ¶pÃ¼k',
         'key': 'kopuk',
-        'icon': '🧽',
+        'icon': 'ðŸ§½',
         'maxThickness': 10.0,
-        'difficulty': 'Çok Kolay',
+        'difficulty': 'Ã‡ok Kolay',
       },
     ],
-    'Metal (Sınırlı)': [
+    'Metal (SÄ±nÄ±rlÄ±)': [
       {
-        'name': 'Anodize Alüminyum',
+        'name': 'Anodize AlÃ¼minyum',
         'key': 'anodize_aluminyum',
-        'icon': '⚙️',
+        'icon': 'âš™ï¸',
         'maxThickness': 1.0,
-        'difficulty': 'Çok Zor',
-        'warning': 'Sadece markalama için, kesim değil',
+        'difficulty': 'Ã‡ok Zor',
+        'warning': 'Sadece markalama iÃ§in, kesim deÄŸil',
       },
     ],
-    'Diğer': [
+    'DiÄŸer': [
       {
-        'name': 'Diğer Malzeme',
+        'name': 'DiÄŸer Malzeme',
         'key': 'diger',
-        'icon': '❓',
+        'icon': 'â“',
         'maxThickness': 10.0,
         'difficulty': 'Bilinmiyor',
       },
@@ -325,50 +353,16 @@ class AppConfig {
 
   // ===== HELPER METHODS =====
 
-  static String getMaterialKeyFromDisplayName(String displayName) {
-    final normalized = displayName.toLowerCase().trim();
-    // Tüm kategorilerde ara
-    for (var category in MATERIAL_CATEGORIES.values) {
-      for (var material in category) {
-        final materialName = (material['name'] as String).toLowerCase();
-        final materialKey = material['key'] as String;
-        if (normalized == materialName || normalized == materialKey) {
-          return materialKey;
-        }
-      }
-    }
-    // Bulunamazsa, normalize edilmiş versiyonu döndür
-    return _normalizeForBackend(normalized);
-  }
-
-  static String _normalizeForBackend(String text) {
-    return text
-        .toLowerCase()
-        .replaceAll('ş', 's')
-        .replaceAll('ç', 'c')
-        .replaceAll('ğ', 'g')
-        .replaceAll('ü', 'u')
-        .replaceAll('ö', 'o')
-        .replaceAll('ı', 'i')
-        .replaceAll(' ', '_')
-        .trim();
-  }
-
-  /// ✅ YENİ: Material key'den backend-safe key'e çevirme
-  static String getMaterialBackendKey(String materialKey) {
-    return _normalizeForBackend(materialKey);
-  }
-
-  /// Makine adından güç aralığını al
+  /// Makine adÄ±ndan gÃ¼Ã§ aralÄ±ÄŸÄ±nÄ± al
   static List<double> getPowerRangeForMachine(String machineName) {
     final machine = SUPPORTED_MACHINES.firstWhere(
       (m) => m['name'] == machineName,
-      orElse: () => SUPPORTED_MACHINES.last, // Diğer
+      orElse: () => SUPPORTED_MACHINES.last, // DiÄŸer
     );
     return List<double>.from(machine['powerRange']);
   }
 
-  /// Makine adından varsayılan gücü al
+  /// Makine adÄ±ndan varsayÄ±lan gÃ¼cÃ¼ al
   static double getDefaultPowerForMachine(String machineName) {
     final machine = SUPPORTED_MACHINES.firstWhere(
       (m) => m['name'] == machineName,
@@ -377,7 +371,7 @@ class AppConfig {
     return machine['defaultPower'].toDouble();
   }
 
-  /// Makine adından max kalınlık al
+  /// Makine adÄ±ndan max kalÄ±nlÄ±k al
   static double getMaxThicknessForMachine(String machineName) {
     final machine = SUPPORTED_MACHINES.firstWhere(
       (m) => m['name'] == machineName,
@@ -386,7 +380,7 @@ class AppConfig {
     return machine['maxThickness']?.toDouble() ?? MAX_THICKNESS;
   }
 
-  /// Malzeme için maksimum kalınlık
+  /// Malzeme iÃ§in maksimum kalÄ±nlÄ±k
   static double getMaxThicknessForMaterial(String materialKey) {
     for (var category in MATERIAL_CATEGORIES.values) {
       final material = category.firstWhere(
@@ -400,7 +394,7 @@ class AppConfig {
     return MAX_THICKNESS;
   }
 
-  /// Tüm malzemeleri düz liste olarak al
+  /// TÃ¼m malzemeleri dÃ¼z liste olarak al
   static List<Map<String, dynamic>> getAllMaterials() {
     List<Map<String, dynamic>> allMaterials = [];
     MATERIAL_CATEGORIES.forEach((category, materials) {
@@ -409,7 +403,7 @@ class AppConfig {
     return allMaterials;
   }
 
-  /// Malzeme key'inden görünen adı al
+  /// Malzeme key'inden gÃ¶rÃ¼nen adÄ± al
   static String getMaterialDisplayName(String materialKey) {
     for (var category in MATERIAL_CATEGORIES.values) {
       final material = category.firstWhere(
@@ -434,7 +428,7 @@ class AppConfig {
         return entry.key;
       }
     }
-    return 'Diğer';
+    return 'DiÄŸer';
   }
 
   /// Malzeme key'inden ikon al
@@ -445,10 +439,10 @@ class AppConfig {
         orElse: () => {},
       );
       if (material.isNotEmpty) {
-        return material['icon'] ?? '❓';
+        return material['icon'] ?? 'â“';
       }
     }
-    return '❓';
+    return 'â“';
   }
 
   /// Malzeme key'inden zorluk al
@@ -465,7 +459,7 @@ class AppConfig {
     return 'Bilinmiyor';
   }
 
-  /// Malzeme key'inden uyarı al
+  /// Malzeme key'inden uyarÄ± al
   static String? getMaterialWarning(String materialKey) {
     for (var category in MATERIAL_CATEGORIES.values) {
       final material = category.firstWhere(
@@ -479,33 +473,35 @@ class AppConfig {
     return null;
   }
 
-  /// Kalınlık değeri için en yakın standart değeri bul
+  /// KalÄ±nlÄ±k deÄŸeri iÃ§in en yakÄ±n standart deÄŸeri bul
   static double getNearestThickness(double value) {
     return THICKNESS_VALUES.reduce((a, b) {
       return (a - value).abs() < (b - value).abs() ? a : b;
     });
   }
 
-  /// Güç değeri için en yakın standart değeri bul
+  /// GÃ¼Ã§ deÄŸeri iÃ§in en yakÄ±n standart deÄŸeri bul
   static double getNearestPower(double value) {
     return STANDARD_POWER_VALUES.reduce((a, b) {
       return (a - value).abs() < (b - value).abs() ? a : b;
     });
   }
 
-  /// Makine için önerilen malzemeleri al
+  /// Makine iÃ§in Ã¶nerilen malzemeleri al
   static List<String> getRecommendedMaterialsForMachine(String machineName) {
     final maxThickness = getMaxThicknessForMachine(machineName);
     final allMaterials = getAllMaterials();
+
     return allMaterials
         .where((m) => (m['maxThickness'] ?? 10.0) <= maxThickness)
         .map((m) => m['key'] as String)
         .toList();
   }
 
-  /// Malzeme için önerilen makineleri al
+  /// Malzeme iÃ§in Ã¶nerilen makineleri al
   static List<String> getRecommendedMachinesForMaterial(String materialKey) {
     final materialMaxThickness = getMaxThicknessForMaterial(materialKey);
+
     return SUPPORTED_MACHINES
         .where((m) => (m['maxThickness'] ?? 10.0) >= materialMaxThickness)
         .map((m) => m['name'] as String)

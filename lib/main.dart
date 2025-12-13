@@ -9,7 +9,7 @@ import 'services/auth_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Firebase başlatma
+  // Firebase baÅŸlatma
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await RemoteConfigService().initialize();
   runApp(const LaserTunerApp());
@@ -25,7 +25,7 @@ class LaserTunerApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        useMaterial3: false,
+        useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.blue,
           brightness: Brightness.light,
@@ -56,7 +56,7 @@ class LaserTunerApp extends StatelessWidget {
   }
 }
 
-// Auth durumuna göre yönlendirme
+// Auth durumuna gÃ¶re yÃ¶nlendirme
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 

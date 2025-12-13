@@ -11,17 +11,17 @@ logger = logging.getLogger(__name__)
 
 class MaterialFeatureEncoder:
     """
-    Malzeme özelliklerini numerical vector'e çevir
-    Firebase'den gelen data → Model input features
+    Malzeme Ã¶zelliklerini numerical vector'e Ã§evir
+    Firebase'den gelen data â†’ Model input features
     
-    Tezde bahsedilen: "malzeme türü, kalınlık, yoğunluk, termal özellikler"
+    Tezde bahsedilen: "malzeme tÃ¼rÃ¼, kalÄ±nlÄ±k, yoÄŸunluk, termal Ã¶zellikler"
     """
     
-    # Malzeme fiziksel özellikleri (normalized)
+    # Malzeme fiziksel Ã¶zellikleri (normalized)
     MATERIAL_PROPERTIES = {
-        # ===== AHŞAP ÜRÜNLERİ =====
-        'ahşap': {
-            'density': 0.60,           # g/cm³
+        # ===== AHÅžAP ÃœRÃœNLERÄ° =====
+        'ahÅŸap': {
+            'density': 0.60,           # g/cmÂ³
             'thermal': 0.15,           # W/mK (thermal conductivity)
             'melt': 0.0,               # Melting point (0 for organic)
             'absorb': 0.85,            # 445nm absorptivity
@@ -74,7 +74,7 @@ class MaterialFeatureEncoder:
             'melt': 0.0,
             'absorb': 0.82,
         },
-        'kayın': {
+        'kayÄ±n': {
             'density': 0.72,
             'thermal': 0.17,
             'melt': 0.0,
@@ -92,7 +92,7 @@ class MaterialFeatureEncoder:
             'melt': 0.0,
             'absorb': 0.81,
         },
-        'meşe': {
+        'meÅŸe': {
             'density': 0.80,
             'thermal': 0.18,
             'melt': 0.0,
@@ -122,7 +122,7 @@ class MaterialFeatureEncoder:
             'melt': 0.0,
             'absorb': 0.83,
         },
-        'akçaağaç': {
+        'akÃ§aaÄŸaÃ§': {
             'density': 0.70,
             'thermal': 0.17,
             'melt': 0.0,
@@ -140,7 +140,7 @@ class MaterialFeatureEncoder:
             'melt': 0.0,
             'absorb': 0.81,
         },
-        'huş': {
+        'huÅŸ': {
             'density': 0.65,
             'thermal': 0.15,
             'melt': 0.0,
@@ -158,7 +158,7 @@ class MaterialFeatureEncoder:
             'melt': 0.0,
             'absorb': 0.84,
         },
-        'çam': {
+        'Ã§am': {
             'density': 0.50,
             'thermal': 0.12,
             'melt': 0.0,
@@ -195,7 +195,7 @@ class MaterialFeatureEncoder:
             'absorb': 0.87,
         },
         
-        # ===== ORGANİK MALZEMELER =====
+        # ===== ORGANÄ°K MALZEMELER =====
         'deri': {
             'density': 0.85,
             'thermal': 0.16,
@@ -220,7 +220,7 @@ class MaterialFeatureEncoder:
             'melt': 0.0,
             'absorb': 0.90,
         },
-        'kağıt': {
+        'kaÄŸÄ±t': {
             'density': 0.30,
             'thermal': 0.05,
             'melt': 0.0,
@@ -238,7 +238,7 @@ class MaterialFeatureEncoder:
             'melt': 0.0,
             'absorb': 0.92,
         },
-        'kumaş': {
+        'kumaÅŸ': {
             'density': 0.40,
             'thermal': 0.06,
             'melt': 0.0,
@@ -256,7 +256,7 @@ class MaterialFeatureEncoder:
             'melt': 0.0,
             'absorb': 0.88,
         },
-        'keçe': {
+        'keÃ§e': {
             'density': 0.35,
             'thermal': 0.05,
             'melt': 0.0,
@@ -287,11 +287,11 @@ class MaterialFeatureEncoder:
             'absorb': 0.91,
         },
         
-        # ===== SENTETİK MALZEMELER =====
+        # ===== SENTETÄ°K MALZEMELER =====
         'akrilik': {
             'density': 1.18,
             'thermal': 0.19,
-            'melt': 0.42,  # ~160°C normalized
+            'melt': 0.42,  # ~160Â°C normalized
             'absorb': 0.65,
         },
         'acrylic': {
@@ -330,7 +330,7 @@ class MaterialFeatureEncoder:
             'melt': 0.35,
             'absorb': 0.70,
         },
-        'köpük': {
+        'kÃ¶pÃ¼k': {
             'density': 0.20,
             'thermal': 0.03,
             'melt': 0.30,
@@ -353,7 +353,7 @@ class MaterialFeatureEncoder:
         'anodize_aluminyum': {
             'density': 2.70,
             'thermal': 2.05,
-            'melt': 0.80,  # ~660°C normalized
+            'melt': 0.80,  # ~660Â°C normalized
             'absorb': 0.20,
         },
         'anodized_aluminum': {
@@ -363,7 +363,7 @@ class MaterialFeatureEncoder:
             'absorb': 0.20,
         },
         
-        # ===== DİĞER =====
+        # ===== DÄ°ÄžER =====
         'diger': {
             'density': 0.70,
             'thermal': 0.15,
@@ -381,12 +381,12 @@ class MaterialFeatureEncoder:
     def encode(self, material_type: str, thickness: float, laser_power: float, 
                process_type: str) -> np.ndarray:
         """
-        Firebase data → Numerical features for model
+        Firebase data â†’ Numerical features for model
         
         Args:
-            material_type: Firebase'den gelen malzeme adı (e.g., "Ahşap")
-            thickness: Kalınlık (mm)
-            laser_power: Lazer gücü (W)
+            material_type: Firebase'den gelen malzeme adÄ± (e.g., "AhÅŸap")
+            thickness: KalÄ±nlÄ±k (mm)
+            laser_power: Lazer gÃ¼cÃ¼ (W)
             process_type: 'cutting', 'engraving', 'scoring'
         
         Returns:
@@ -395,7 +395,7 @@ class MaterialFeatureEncoder:
              thickness_norm, power_norm, 
              is_cutting, is_engraving, is_scoring]
         """
-        # Malzeme özelliklerini al (normalize edilmiş)
+        # Malzeme Ã¶zelliklerini al (normalize edilmiÅŸ)
         material_lower = material_type.lower().strip()
         
         # Try exact match first
@@ -406,12 +406,12 @@ class MaterialFeatureEncoder:
             for key in self.MATERIAL_PROPERTIES.keys():
                 if key in material_lower or material_lower in key:
                     props = self.MATERIAL_PROPERTIES[key]
-                    logger.info(f"✅ Material matched: '{material_type}' → '{key}'")
+                    logger.info(f"âœ… Material matched: '{material_type}' â†’ '{key}'")
                     break
         
         # Default fallback
         if props is None:
-            logger.warning(f"⚠️ Unknown material: {material_type}, using default")
+            logger.warning(f"âš ï¸ Unknown material: {material_type}, using default")
             props = {
                 'density': 0.70,
                 'thermal': 0.15,
@@ -419,9 +419,9 @@ class MaterialFeatureEncoder:
                 'absorb': 0.80,
             }
         
-        # Feature vector oluştur (9 features)
+        # Feature vector oluÅŸtur (9 features)
         features = np.array([
-            props['density'] / 3.0,           # Normalize (max ~3.0 g/cm³)
+            props['density'] / 3.0,           # Normalize (max ~3.0 g/cmÂ³)
             props['thermal'] / 2.5,           # Normalize (max ~2.5 W/mK)
             props['melt'],                    # Already 0-1
             props['absorb'],                  # Already 0-1
@@ -436,7 +436,7 @@ class MaterialFeatureEncoder:
     
     def encode_batch(self, firebase_data: list) -> tuple:
         """
-        Birden fazla Firebase kaydını batch olarak encode et
+        Birden fazla Firebase kaydÄ±nÄ± batch olarak encode et
         
         Args:
             firebase_data: List of dicts from get_training_data_for_transfer_learning()
@@ -482,7 +482,7 @@ class MaterialFeatureEncoder:
                 y_passes.append(data['targetPasses'] / 20.0)  # Passes max 20
                 
             except Exception as e:
-                logger.warning(f"⚠️ Failed to encode sample: {e}")
+                logger.warning(f"âš ï¸ Failed to encode sample: {e}")
                 continue
         
         if len(X) == 0:

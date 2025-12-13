@@ -33,7 +33,7 @@ class ExperimentModel {
   final double materialThickness;
   final Map<String, ProcessParams> processes;
   final String photoUrl;
-  final String photoUrl2; // İkinci fotoğraf
+  final String photoUrl2; // Ä°kinci fotoÄŸraf
   final Map<String, int> qualityScores;
   final String dataSource;
   final String verificationStatus;

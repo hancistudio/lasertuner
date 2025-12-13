@@ -63,7 +63,7 @@ class _DataListScreenState extends State<DataListScreen>
             ),
             Tab(
               icon: Icon(Icons.verified, size: isLargeScreen ? 24 : 20),
-              text: isLargeScreen ? 'Doğrulanmış' : 'Onaylı',
+              text: isLargeScreen ? 'DoÄŸrulanmÄ±ÅŸ' : 'OnaylÄ±',
             ),
             Tab(
               icon: Icon(Icons.star, size: isLargeScreen ? 24 : 20),
@@ -139,7 +139,7 @@ class _DataListTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Henüz veri yok',
+                  'HenÃ¼z veri yok',
                   style: TextStyle(
                     color: isDark ? Colors.grey.shade400 : Colors.grey.shade600,
                     fontSize: screenWidth > 600 ? 18 : 16,
@@ -228,7 +228,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
         });
       }
     } catch (e) {
-      print('Kullanıcı bilgisi yükleme hatası: $e');
+      print('KullanÄ±cÄ± bilgisi yÃ¼kleme hatasÄ±: $e');
     }
   }
 
@@ -285,7 +285,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
               children: [
                 Row(
                   children: [
-                    // İkon
+                    // Ä°kon
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
@@ -309,8 +309,8 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                     ),
                     const SizedBox(width: 12),
 
-                    // Başlık bilgileri
-                    // Başlık bilgileri
+                    // BaÅŸlÄ±k bilgileri
+                    // BaÅŸlÄ±k bilgileri
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -325,7 +325,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            // ⬇️ BURADA DEĞİŞTİR
+                            // â¬‡ï¸ BURADA DEÄžÄ°ÅžTÄ°R
                             '${AppConfig.getMaterialDisplayName(widget.experiment.materialType)} - ${widget.experiment.materialThickness}mm',
                             style: TextStyle(
                               color:
@@ -371,7 +371,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                         ),
                       ),
 
-                    // Onay/Red sayıları
+                    // Onay/Red sayÄ±larÄ±
                     if (isPending &&
                         (widget.experiment.approveCount > 0 ||
                             widget.experiment.rejectCount > 0))
@@ -424,7 +424,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                   ],
                 ),
 
-                // Kullanıcı bilgisi
+                // KullanÄ±cÄ± bilgisi
                 const SizedBox(height: 12),
                 InkWell(
                   onTap: () {
@@ -476,7 +476,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                           children: [
                             Text(
                               _userData?['email']?.split('@')[0] ??
-                                  'Yükleniyor...',
+                                  'YÃ¼kleniyor...',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: isLargeScreen ? 13 : 12,
@@ -527,7 +527,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
               height: isLargeScreen ? 300 : 200,
               child: Builder(
                 builder: (context) {
-                  // Fotoğrafları topla
+                  // FotoÄŸraflarÄ± topla
                   final photoUrls = <String>[];
                   if (widget.experiment.photoUrl.isNotEmpty) {
                     photoUrls.add(widget.experiment.photoUrl);
@@ -560,13 +560,13 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                 },
               ),
             ),
-          // İçerik
+          // Ä°Ã§erik
           Padding(
             padding: EdgeInsets.all(isLargeScreen ? 20 : 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Özet bilgi
+                // Ã–zet bilgi
                 Wrap(
                   spacing: isLargeScreen ? 12 : 8,
                   runSpacing: isLargeScreen ? 12 : 8,
@@ -579,7 +579,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                     ),
                     _InfoChip(
                       icon: Icons.layers,
-                      label: '${widget.experiment.processes.length} işlem',
+                      label: '${widget.experiment.processes.length} iÅŸlem',
                       isDark: isDark,
                       isLarge: isLargeScreen,
                     ),
@@ -595,7 +595,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                 if (_isExpanded) ...[
                   const Divider(height: 32),
 
-                  // Detaylı parametreler
+                  // DetaylÄ± parametreler
                   ...widget.experiment.processes.entries.map((entry) {
                     return _ProcessDetails(
                       processName: _getProcessName(entry.key),
@@ -607,7 +607,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                   }).toList(),
                 ],
 
-                // Genişlet/Daralt butonu
+                // GeniÅŸlet/Daralt butonu
                 const SizedBox(height: 8),
                 Center(
                   child: TextButton.icon(
@@ -617,7 +617,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                       color: isDark ? Colors.blue.shade300 : Colors.blue,
                     ),
                     label: Text(
-                      _isExpanded ? 'Daha Az' : 'Detayları Gör',
+                      _isExpanded ? 'Daha Az' : 'DetaylarÄ± GÃ¶r',
                       style: TextStyle(
                         color: isDark ? Colors.blue.shade300 : Colors.blue,
                       ),
@@ -625,7 +625,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                   ),
                 ),
 
-                // Oylama bölümü
+                // Oylama bÃ¶lÃ¼mÃ¼
                 if (widget.showVoting && isPending) ...[
                   const Divider(),
                   _VotingSection(
@@ -714,16 +714,16 @@ class _ExperimentCardState extends State<_ExperimentCard> {
       case 'cutting':
         return 'Kesme';
       case 'engraving':
-        return 'Kazıma';
+        return 'KazÄ±ma';
       case 'scoring':
-        return 'Çizme';
+        return 'Ã‡izme';
       default:
         return key;
     }
   }
 }
 
-// _PhotoCarousel widget'ını _VotingSection'dan önce ekleyin
+// _PhotoCarousel widget'Ä±nÄ± _VotingSection'dan Ã¶nce ekleyin
 
 class _PhotoCarousel extends StatefulWidget {
   final List<String> photoUrls;
@@ -820,7 +820,7 @@ class _PhotoCarouselState extends State<_PhotoCarousel> {
           },
         ),
 
-        // Fotoğraf sayısı göstergesi (birden fazla varsa)
+        // FotoÄŸraf sayÄ±sÄ± gÃ¶stergesi (birden fazla varsa)
         if (widget.photoUrls.length > 1)
           Positioned(
             top: 8,
@@ -849,7 +849,7 @@ class _PhotoCarouselState extends State<_PhotoCarousel> {
             ),
           ),
 
-        // Nokta göstergeleri (birden fazla varsa)
+        // Nokta gÃ¶stergeleri (birden fazla varsa)
         if (widget.photoUrls.length > 1)
           Positioned(
             bottom: 8,
@@ -881,7 +881,7 @@ class _PhotoCarouselState extends State<_PhotoCarousel> {
             ),
           ),
 
-        // Sol ok (birden fazla fotoğraf varsa)
+        // Sol ok (birden fazla fotoÄŸraf varsa)
         if (widget.photoUrls.length > 1 && _currentPage > 0)
           Positioned(
             left: 8,
@@ -911,7 +911,7 @@ class _PhotoCarouselState extends State<_PhotoCarousel> {
             ),
           ),
 
-        // Sağ ok (birden fazla fotoğraf varsa)
+        // SaÄŸ ok (birden fazla fotoÄŸraf varsa)
         if (widget.photoUrls.length > 1 &&
             _currentPage < widget.photoUrls.length - 1)
           Positioned(
@@ -1128,18 +1128,18 @@ class _ProcessDetails extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _ParamItem(
-                'Güç',
+                'GÃ¼Ã§',
                 '${params.power.toStringAsFixed(1)}%',
                 isDark,
                 isLarge,
               ),
               _ParamItem(
-                'Hız',
+                'HÄ±z',
                 '${params.speed.toStringAsFixed(0)} mm/s',
                 isDark,
                 isLarge,
               ),
-              _ParamItem('Geçiş', '${params.passes}', isDark, isLarge),
+              _ParamItem('GeÃ§iÅŸ', '${params.passes}', isDark, isLarge),
               _ParamItem('Kalite', '$quality/10', isDark, isLarge),
             ],
           ),
@@ -1245,7 +1245,7 @@ class _VotingSectionState extends State<_VotingSection> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isApprove ? '✅ Onaylandı!' : '❌ Reddedildi!'),
+            content: Text(isApprove ? 'âœ… OnaylandÄ±!' : 'âŒ Reddedildi!'),
             backgroundColor: isApprove ? Colors.green : Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -1277,7 +1277,7 @@ class _VotingSectionState extends State<_VotingSection> {
                 Icon(Icons.swap_horiz, color: Colors.orange),
                 const SizedBox(width: 12),
                 Text(
-                  'Oyunu Değiştir',
+                  'Oyunu DeÄŸiÅŸtir',
                   style: TextStyle(
                     color: widget.isDark ? Colors.white : Colors.black87,
                   ),
@@ -1289,7 +1289,7 @@ class _VotingSectionState extends State<_VotingSection> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Şu anki oyunuz: ${_userVoteChoice == true ? "Onay" : "Red"}',
+                  'Åžu anki oyunuz: ${_userVoteChoice == true ? "Onay" : "Red"}',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: _userVoteChoice == true ? Colors.green : Colors.red,
@@ -1297,7 +1297,7 @@ class _VotingSectionState extends State<_VotingSection> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Oyunuzu değiştirmek istediğinize emin misiniz?',
+                  'Oyunuzu deÄŸiÅŸtirmek istediÄŸinize emin misiniz?',
                   style: TextStyle(
                     color:
                         widget.isDark ? Colors.grey.shade300 : Colors.black87,
@@ -1309,7 +1309,7 @@ class _VotingSectionState extends State<_VotingSection> {
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: Text(
-                  'İptal',
+                  'Ä°ptal',
                   style: TextStyle(
                     color:
                         widget.isDark
@@ -1327,7 +1327,7 @@ class _VotingSectionState extends State<_VotingSection> {
                   backgroundColor: Colors.orange,
                   foregroundColor: Colors.white,
                 ),
-                child: const Text('Evet, Değiştir'),
+                child: const Text('Evet, DeÄŸiÅŸtir'),
               ),
             ],
           ),
@@ -1356,7 +1356,7 @@ class _VotingSectionState extends State<_VotingSection> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              newVoteChoice ? '✅ Onaya çevrildi!' : '❌ Redde çevrildi!',
+              newVoteChoice ? 'âœ… Onaya Ã§evrildi!' : 'âŒ Redde Ã§evrildi!',
             ),
             backgroundColor: newVoteChoice ? Colors.green : Colors.red,
             behavior: SnackBarBehavior.floating,
@@ -1425,7 +1425,7 @@ class _VotingSectionState extends State<_VotingSection> {
                 Expanded(
                   child: Text(
                     _userVoteChoice == true
-                        ? 'Bu veriyi onayladınız'
+                        ? 'Bu veriyi onayladÄ±nÄ±z'
                         : 'Bu veriyi reddettiniz',
                     style: TextStyle(
                       color:
@@ -1438,7 +1438,7 @@ class _VotingSectionState extends State<_VotingSection> {
                 TextButton(
                   onPressed: _showChangeVoteDialog,
                   child: Text(
-                    'Değiştir',
+                    'DeÄŸiÅŸtir',
                     style: TextStyle(
                       color:
                           _userVoteChoice == true
@@ -1480,7 +1480,7 @@ class _VotingSectionState extends State<_VotingSection> {
               ),
               const SizedBox(width: 8),
               Text(
-                'Bu veri doğru mu?',
+                'Bu veri doÄŸru mu?',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: widget.isLarge ? 15 : 14,

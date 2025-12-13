@@ -40,7 +40,7 @@ class _ResearcherPanelScreenState extends State<ResearcherPanelScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Araştırmacı Paneli',
+          'AraÅŸtÄ±rmacÄ± Paneli',
           style: TextStyle(color: Colors.white),
         ),
         backgroundColor: Colors.orange,
@@ -52,7 +52,7 @@ class _ResearcherPanelScreenState extends State<ResearcherPanelScreen>
           unselectedLabelColor: Colors.white70,
           tabs: const [
             Tab(icon: Icon(Icons.science), text: 'Veri Ekle'),
-            Tab(icon: Icon(Icons.upload_file), text: 'İçe Aktar'),
+            Tab(icon: Icon(Icons.upload_file), text: 'Ä°Ã§e Aktar'),
             Tab(icon: Icon(Icons.list_alt), text: 'Verilerim'),
           ],
         ),
@@ -69,7 +69,7 @@ class _ResearcherPanelScreenState extends State<ResearcherPanelScreen>
   }
 }
 
-// ========== TAB 1: DENEY VERİSİ EKLE ==========
+// ========== TAB 1: DENEY VERÄ°SÄ° EKLE ==========
 class _ExperimentDataTab extends StatefulWidget {
   final String userId;
   const _ExperimentDataTab({required this.userId});
@@ -78,34 +78,34 @@ class _ExperimentDataTab extends StatefulWidget {
   State<_ExperimentDataTab> createState() => _ExperimentDataTabState();
 }
 
-// ========== _ExperimentDataTab İÇİN TAM KOD ==========
-// Bu kodu researcher_panel_screen.dart içindeki _ExperimentDataTab ve _ExperimentDataTabState ile değiştirin
+// ========== _ExperimentDataTab Ä°Ã‡Ä°N TAM KOD ==========
+// Bu kodu researcher_panel_screen.dart iÃ§indeki _ExperimentDataTab ve _ExperimentDataTabState ile deÄŸiÅŸtirin
 
 class _ExperimentDataTabState extends State<_ExperimentDataTab> {
   final FirestoreService _firestoreService = FirestoreService();
   final ImagePicker _imagePicker = ImagePicker();
 
-  // ✅ AppConfig entegrasyonu - Dropdown/Chip seçimleri
+  // âœ… AppConfig entegrasyonu - Dropdown/Chip seÃ§imleri
   String? _selectedMachine;
   double? _selectedPower;
   String? _selectedMaterial;
   double? _selectedThickness;
 
-  // Fotoğraf değişkenleri
+  // FotoÄŸraf deÄŸiÅŸkenleri
   XFile? _selectedImageFile;
   Uint8List? _webImage;
   XFile? _selectedImageFile2;
   Uint8List? _webImage2;
   bool _isLoading = false;
 
-  // İşlem seçimleri
+  // Ä°ÅŸlem seÃ§imleri
   final Map<String, bool> _selectedProcesses = {
     'cutting': false,
     'engraving': false,
     'scoring': false,
   };
 
-  // İşlem parametreleri
+  // Ä°ÅŸlem parametreleri
   final Map<String, Map<String, TextEditingController>> _processControllers = {
     'cutting': {
       'power': TextEditingController(),
@@ -124,7 +124,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
     },
   };
 
-  // Kalite skorları
+  // Kalite skorlarÄ±
   final Map<String, double> _qualityScores = {
     'cutting': 5,
     'engraving': 5,
@@ -155,38 +155,38 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
         }
       }
     } catch (e) {
-      _showSnackBar('Resim seçme hatası: $e');
+      _showSnackBar('Resim seÃ§me hatasÄ±: $e');
     }
   }
 
   Future<void> _submitData() async {
-    // ✅ Validasyonlar
+    // âœ… Validasyonlar
     if (_selectedMachine == null) {
-      _showSnackBar('⚠️ Lütfen makine seçin');
+      _showSnackBar('âš ï¸ LÃ¼tfen makine seÃ§in');
       return;
     }
     if (_selectedPower == null) {
-      _showSnackBar('⚠️ Lütfen lazer gücü seçin');
+      _showSnackBar('âš ï¸ LÃ¼tfen lazer gÃ¼cÃ¼ seÃ§in');
       return;
     }
     if (_selectedMaterial == null) {
-      _showSnackBar('⚠️ Lütfen malzeme seçin');
+      _showSnackBar('âš ï¸ LÃ¼tfen malzeme seÃ§in');
       return;
     }
     if (_selectedThickness == null) {
-      _showSnackBar('⚠️ Lütfen kalınlık seçin');
+      _showSnackBar('âš ï¸ LÃ¼tfen kalÄ±nlÄ±k seÃ§in');
       return;
     }
     if (!_selectedProcesses.containsValue(true)) {
-      _showSnackBar('En az bir işlem tipi seçin');
+      _showSnackBar('En az bir iÅŸlem tipi seÃ§in');
       return;
     }
     if (_selectedImageFile == null) {
-      _showSnackBar('Lütfen en az bir fotoğraf yükleyin');
+      _showSnackBar('LÃ¼tfen en az bir fotoÄŸraf yÃ¼kleyin');
       return;
     }
 
-    // Process parametreleri kontrolü
+    // Process parametreleri kontrolÃ¼
     for (var entry in _selectedProcesses.entries) {
       if (entry.value) {
         final controllers = _processControllers[entry.key]!;
@@ -194,7 +194,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
             controllers['speed']!.text.isEmpty ||
             controllers['passes']!.text.isEmpty) {
           _showSnackBar(
-            '⚠️ ${_getProcessName(entry.key)} için tüm parametreleri girin',
+            'âš ï¸ ${_getProcessName(entry.key)} iÃ§in tÃ¼m parametreleri girin',
           );
           return;
         }
@@ -203,61 +203,53 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
 
     setState(() => _isLoading = true);
 
-      try {
-    Map<String, ProcessParams> processes = {};
-    Map<String, int> qualityScores = {};
+    try {
+      Map<String, ProcessParams> processes = {};
+      Map<String, int> qualityScores = {};
 
-    _selectedProcesses.forEach((processType, isSelected) {
-      if (isSelected) {
-        final controllers = _processControllers[processType]!;
-        processes[processType] = ProcessParams(
-          power: double.parse(controllers['power']!.text),
-          speed: double.parse(controllers['speed']!.text),
-          passes: int.parse(controllers['passes']!.text),
-        );
-        qualityScores[processType] = _qualityScores[processType]!.toInt();
-      }
-    });
+      _selectedProcesses.forEach((processType, isSelected) {
+        if (isSelected) {
+          final controllers = _processControllers[processType]!;
+          processes[processType] = ProcessParams(
+            power: double.parse(controllers['power']!.text),
+            speed: double.parse(controllers['speed']!.text),
+            passes: int.parse(controllers['passes']!.text),
+          );
+          qualityScores[processType] = _qualityScores[processType]!.toInt();
+        }
+      });
 
-    // ✅ Material display name'i backend-safe key'e çevir
-    final backendMaterialKey = AppConfig.getMaterialBackendKey(_selectedMaterial!);
-    final displayName = AppConfig.getMaterialDisplayName(_selectedMaterial!);
+      ExperimentModel experiment = ExperimentModel(
+        id: '',
+        userId: widget.userId,
+        machineBrand: _selectedMachine!, // âœ… Dropdown'dan
+        laserPower: _selectedPower!, // âœ… Chip'den
+        materialType: AppConfig.getMaterialDisplayName(
+          _selectedMaterial!,
+        ), // âœ… Display name
+        materialThickness: _selectedThickness!, // âœ… Chip'den
+        processes: processes,
+        photoUrl: '',
+        photoUrl2: '',
+        qualityScores: qualityScores,
+        dataSource: 'researcher',
+        verificationStatus: 'verified',
+        createdAt: DateTime.now(),
+      );
 
-    print('🔄 Researcher Material conversion:');
-    print('   Selected key: $_selectedMaterial');
-    print('   Display name: $displayName');
-    print('   Backend key: $backendMaterialKey');
-
-    ExperimentModel experiment = ExperimentModel(
-      id: '',
-      userId: widget.userId,
-      machineBrand: _selectedMachine!,
-      laserPower: _selectedPower!,
-      materialType: displayName, // ✅ Display name Firebase'e kaydedilir
-      materialThickness: _selectedThickness!,
-      processes: processes,
-      photoUrl: '',
-      photoUrl2: '',
-      qualityScores: qualityScores,
-      dataSource: 'researcher',
-      verificationStatus: 'verified',
-      createdAt: DateTime.now(),
-    );
-
-    await _firestoreService.addExperiment(
-      experiment,
-      _selectedImageFile!,
-      imageFile2: _selectedImageFile2,
-    );
-    
-    _showSnackBar('✅ Gold Standard veri başarıyla eklendi!');
-    _clearForm();
-  } catch (e) {
-    _showSnackBar('❌ Hata: ${e.toString()}');
-  } finally {
-    if (mounted) setState(() => _isLoading = false);
+      await _firestoreService.addExperiment(
+        experiment,
+        _selectedImageFile!,
+        imageFile2: _selectedImageFile2,
+      );
+      _showSnackBar('âœ… Gold Standard veri baÅŸarÄ±yla eklendi!');
+      _clearForm();
+    } catch (e) {
+      _showSnackBar('âŒ Hata: ${e.toString()}');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
-}
 
   void _clearForm() {
     _processControllers.values.forEach(
@@ -293,9 +285,9 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
       case 'cutting':
         return 'Kesme';
       case 'engraving':
-        return 'Kazıma';
+        return 'KazÄ±ma';
       case 'scoring':
-        return 'Çizme';
+        return 'Ã‡izme';
       default:
         return key;
     }
@@ -323,7 +315,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Doğrulanmış laboratuvar verilerini ekleyin. Veriler "Gold Standard" olarak işaretlenecektir.',
+                          'DoÄŸrulanmÄ±ÅŸ laboratuvar verilerini ekleyin. Veriler "Gold Standard" olarak iÅŸaretlenecektir.',
                           style: TextStyle(color: Colors.orange.shade900),
                         ),
                       ),
@@ -333,15 +325,15 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
               ),
               const SizedBox(height: 24),
 
-              // ✅ Makine seçimi (AppConfig entegrasyonu)
+              // âœ… Makine seÃ§imi (AppConfig entegrasyonu)
               _buildMachineSection(isDark),
               const SizedBox(height: 16),
 
-              // ✅ Malzeme seçimi (AppConfig entegrasyonu)
+              // âœ… Malzeme seÃ§imi (AppConfig entegrasyonu)
               _buildMaterialSection(isDark),
               const SizedBox(height: 16),
 
-              // İşlem tipleri
+              // Ä°ÅŸlem tipleri
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -353,7 +345,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                           Icon(Icons.settings, color: Colors.purple),
                           const SizedBox(width: 8),
                           Text(
-                            'İşlem Tipleri',
+                            'Ä°ÅŸlem Tipleri',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                         ],
@@ -366,7 +358,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
               ),
               const SizedBox(height: 16),
 
-              // Fotoğraflar
+              // FotoÄŸraflar
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -378,14 +370,14 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                           Icon(Icons.photo_library, color: Colors.orange),
                           const SizedBox(width: 8),
                           Text(
-                            'Fotoğraflar',
+                            'FotoÄŸraflar',
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'En az 1, en fazla 2 fotoğraf ekleyebilirsiniz.',
+                        'En az 1, en fazla 2 fotoÄŸraf ekleyebilirsiniz.',
                         style: TextStyle(
                           color: Colors.grey.shade600,
                           fontSize: 13,
@@ -394,7 +386,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                       const SizedBox(height: 16),
 
                       _buildPhotoSection(
-                        title: '1. Fotoğraf (Zorunlu)',
+                        title: '1. FotoÄŸraf (Zorunlu)',
                         imageFile: _selectedImageFile,
                         webImage: _webImage,
                         onPick: () => _pickImage(isSecond: false),
@@ -408,7 +400,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                       ),
                       const SizedBox(height: 16),
                       _buildPhotoSection(
-                        title: '2. Fotoğraf (İsteğe Bağlı)',
+                        title: '2. FotoÄŸraf (Ä°steÄŸe BaÄŸlÄ±)',
                         imageFile: _selectedImageFile2,
                         webImage: _webImage2,
                         onPick: () => _pickImage(isSecond: true),
@@ -438,7 +430,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
     );
   }
 
-  // ========== MAKINE SEÇİMİ (AppConfig) ==========
+  // ========== MAKINE SEÃ‡Ä°MÄ° (AppConfig) ==========
   Widget _buildMachineSection(bool isDark) {
     return Card(
       child: Padding(
@@ -507,7 +499,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
               const Divider(),
               const SizedBox(height: 16),
               Text(
-                'Lazer Gücü',
+                'Lazer GÃ¼cÃ¼',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -547,7 +539,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
     );
   }
 
-  // ========== MALZEME SEÇİMİ (AppConfig) ==========
+  // ========== MALZEME SEÃ‡Ä°MÄ° (AppConfig) ==========
   Widget _buildMaterialSection(bool isDark) {
     return Card(
       child: Padding(
@@ -651,7 +643,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
               Row(
                 children: [
                   Text(
-                    'Kalınlık (mm)',
+                    'KalÄ±nlÄ±k (mm)',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -723,7 +715,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
     );
   }
 
-  // ========== İŞLEM PARAMETRELERİ ==========
+  // ========== Ä°ÅžLEM PARAMETRELERÄ° ==========
   List<Widget> _buildProcessSelections() {
     List<Widget> widgets = [];
     _selectedProcesses.forEach((processType, isSelected) {
@@ -783,7 +775,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                               controller:
                                   _processControllers[processType]!['power']!,
                               decoration: InputDecoration(
-                                labelText: 'Güç (%)',
+                                labelText: 'GÃ¼Ã§ (%)',
                                 hintText: '0-100',
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
@@ -802,7 +794,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                               controller:
                                   _processControllers[processType]!['speed']!,
                               decoration: InputDecoration(
-                                labelText: 'Hız (mm/s)',
+                                labelText: 'HÄ±z (mm/s)',
                                 hintText: '50-500',
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
@@ -821,7 +813,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                               controller:
                                   _processControllers[processType]!['passes']!,
                               decoration: InputDecoration(
-                                labelText: 'Geçiş',
+                                labelText: 'GeÃ§iÅŸ',
                                 hintText: '1-20',
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
@@ -872,7 +864,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
     return widgets;
   }
 
-  // ========== FOTOĞRAF YÜKLENMESİ ==========
+  // ========== FOTOÄžRAF YÃœKLENMESÄ° ==========
   Widget _buildPhotoSection({
     required String title,
     required XFile? imageFile,
@@ -977,7 +969,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
             OutlinedButton.icon(
               onPressed: onPick,
               icon: const Icon(Icons.refresh),
-              label: const Text('Değiştir'),
+              label: const Text('DeÄŸiÅŸtir'),
             ),
           ] else
             GestureDetector(
@@ -1002,7 +994,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Fotoğraf Ekle',
+                        'FotoÄŸraf Ekle',
                         style: TextStyle(
                           color: Colors.orange,
                           fontWeight: FontWeight.w500,
@@ -1027,7 +1019,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
   }
 }
 
-// ========== TAB 2: HARİCİ VERİ İÇE AKTAR ==========
+// ========== TAB 2: HARÄ°CÄ° VERÄ° Ä°Ã‡E AKTAR ==========
 class _ExternalDataTab extends StatefulWidget {
   final String userId;
   const _ExternalDataTab({required this.userId});
@@ -1061,7 +1053,7 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
         }
       }
     } catch (e) {
-      _showSnackBar('Dosya seçme hatası: $e');
+      _showSnackBar('Dosya seÃ§me hatasÄ±: $e');
     }
   }
 
@@ -1076,7 +1068,7 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
           );
         else
           setState(() => _parsedData = [Map<String, dynamic>.from(jsonData)]);
-        _showSnackBar('${_parsedData!.length} kayıt bulundu');
+        _showSnackBar('${_parsedData!.length} kayÄ±t bulundu');
       } else if (extension == 'csv') {
         List<String> lines = content.split('\n');
         if (lines.length > 1) {
@@ -1093,17 +1085,17 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
             data.add(row);
           }
           setState(() => _parsedData = data);
-          _showSnackBar('${_parsedData!.length} kayıt bulundu');
+          _showSnackBar('${_parsedData!.length} kayÄ±t bulundu');
         }
       }
     } catch (e) {
-      _showSnackBar('Dosya parse hatası: $e');
+      _showSnackBar('Dosya parse hatasÄ±: $e');
     }
   }
 
   Future<void> _importData() async {
     if (_parsedData == null || _parsedData!.isEmpty) {
-      _showSnackBar('İçe aktarılacak veri bulunamadı');
+      _showSnackBar('Ä°Ã§e aktarÄ±lacak veri bulunamadÄ±');
       return;
     }
 
@@ -1174,13 +1166,13 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
         }
       }
 
-      _showSnackBar('✅ $successCount kayıt eklendi, ❌ $errorCount hata');
+      _showSnackBar('âœ… $successCount kayÄ±t eklendi, âŒ $errorCount hata');
       setState(() {
         _parsedData = null;
         _fileName = null;
       });
     } catch (e) {
-      _showSnackBar('Import hatası: $e');
+      _showSnackBar('Import hatasÄ±: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -1215,7 +1207,7 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              'JSON veya CSV Formatında Toplu Veri İçe Aktarma',
+                              'JSON veya CSV FormatÄ±nda Toplu Veri Ä°Ã§e Aktarma',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.blue.shade900,
@@ -1226,7 +1218,7 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Beklenen JSON formatı:\n[\n  {\n    "machineBrand": "Epilog Laser",\n    "laserPower": 100,\n    "materialType": "Ahşap",\n    "materialThickness": 3,\n    "cutting_power": 80,\n    "cutting_speed": 250,\n    "cutting_passes": 1,\n    "cutting_quality": 8\n  }\n]',
+                        'Beklenen JSON formatÄ±:\n[\n  {\n    "machineBrand": "Epilog Laser",\n    "laserPower": 100,\n    "materialType": "AhÅŸap",\n    "materialThickness": 3,\n    "cutting_power": 80,\n    "cutting_speed": 250,\n    "cutting_passes": 1,\n    "cutting_quality": 8\n  }\n]',
                         style: TextStyle(
                           fontFamily: 'monospace',
                           fontSize: 11,
@@ -1250,7 +1242,7 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Dosya Yükle',
+                        'Dosya YÃ¼kle',
                         style: Theme.of(context).textTheme.titleLarge,
                       ),
                       const SizedBox(height: 24),
@@ -1272,7 +1264,7 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
                               Expanded(child: Text('Dosya: $_fileName')),
                               if (_parsedData != null)
                                 Chip(
-                                  label: Text('${_parsedData!.length} kayıt'),
+                                  label: Text('${_parsedData!.length} kayÄ±t'),
                                   backgroundColor: Colors.green.shade100,
                                 ),
                             ],
@@ -1282,7 +1274,7 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
                       ElevatedButton.icon(
                         onPressed: _pickFile,
                         icon: const Icon(Icons.folder_open),
-                        label: const Text('JSON/CSV Dosyası Seç'),
+                        label: const Text('JSON/CSV DosyasÄ± SeÃ§'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,
@@ -1296,7 +1288,7 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
                         const SizedBox(height: 24),
                         CustomButton(
                           text:
-                              'Verileri İçe Aktar (${_parsedData!.length} kayıt)',
+                              'Verileri Ä°Ã§e Aktar (${_parsedData!.length} kayÄ±t)',
                           onPressed: _importData,
                           isLoading: _isLoading,
                         ),
@@ -1313,7 +1305,7 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
   }
 }
 
-// ========== TAB 3: EKLEDİĞİM VERİLER ==========
+// ========== TAB 3: EKLEDÄ°ÄžÄ°M VERÄ°LER ==========
 class _MyDataTab extends StatelessWidget {
   final String userId;
   const _MyDataTab({required this.userId});
@@ -1343,12 +1335,12 @@ class _MyDataTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Henüz veri eklemediniz',
+                  'HenÃ¼z veri eklemediniz',
                   style: TextStyle(fontSize: 18, color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'İlk sekmeden yeni veri ekleyebilirsiniz.',
+                  'Ä°lk sekmeden yeni veri ekleyebilirsiniz.',
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
                 ),
               ],
@@ -1509,7 +1501,7 @@ class _ResearcherDataCardState extends State<_ResearcherDataCard> {
             ),
           ),
 
-          // Fotoğraflar
+          // FotoÄŸraflar
           if (photos.isNotEmpty) ...[
             Stack(
               children: [
@@ -1620,7 +1612,7 @@ class _ResearcherDataCardState extends State<_ResearcherDataCard> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Fotoğraf yok (İçe aktarılan veri)',
+                      'FotoÄŸraf yok (Ä°Ã§e aktarÄ±lan veri)',
                       style: TextStyle(
                         color: Colors.grey.shade500,
                         fontSize: 12,
@@ -1631,7 +1623,7 @@ class _ResearcherDataCardState extends State<_ResearcherDataCard> {
               ),
             ),
 
-          // İçerik
+          // Ä°Ã§erik
           Padding(
             padding: EdgeInsets.all(widget.isLarge ? 16 : 12),
             child: Column(
@@ -1648,7 +1640,7 @@ class _ResearcherDataCardState extends State<_ResearcherDataCard> {
                     ),
                     _InfoChip(
                       icon: Icons.layers,
-                      label: '${exp.processes.length} işlem',
+                      label: '${exp.processes.length} iÅŸlem',
                       isDark: widget.isDark,
                     ),
                     _InfoChip(
@@ -1660,13 +1652,13 @@ class _ResearcherDataCardState extends State<_ResearcherDataCard> {
                     if (photos.length > 1)
                       _InfoChip(
                         icon: Icons.photo_library,
-                        label: '${photos.length} fotoğraf',
+                        label: '${photos.length} fotoÄŸraf',
                         isDark: widget.isDark,
                       ),
                     if (isImported)
                       _InfoChip(
                         icon: Icons.upload_file,
-                        label: 'İçe aktarıldı',
+                        label: 'Ä°Ã§e aktarÄ±ldÄ±',
                         isDark: widget.isDark,
                       ),
                   ],
@@ -1679,8 +1671,8 @@ class _ResearcherDataCardState extends State<_ResearcherDataCard> {
                         entry.key == 'cutting'
                             ? 'Kesme'
                             : entry.key == 'engraving'
-                            ? 'Kazıma'
-                            : 'Çizme';
+                            ? 'KazÄ±ma'
+                            : 'Ã‡izme';
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(12),
@@ -1708,17 +1700,17 @@ class _ResearcherDataCardState extends State<_ResearcherDataCard> {
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
                               _ParamItem(
-                                'Güç',
+                                'GÃ¼Ã§',
                                 '${entry.value.power.toStringAsFixed(1)}%',
                                 widget.isDark,
                               ),
                               _ParamItem(
-                                'Hız',
+                                'HÄ±z',
                                 '${entry.value.speed.toStringAsFixed(0)} mm/s',
                                 widget.isDark,
                               ),
                               _ParamItem(
-                                'Geçiş',
+                                'GeÃ§iÅŸ',
                                 '${entry.value.passes}',
                                 widget.isDark,
                               ),
@@ -1744,7 +1736,7 @@ class _ResearcherDataCardState extends State<_ResearcherDataCard> {
                       color: Colors.orange,
                     ),
                     label: Text(
-                      _isExpanded ? 'Daha Az' : 'Detayları Gör',
+                      _isExpanded ? 'Daha Az' : 'DetaylarÄ± GÃ¶r',
                       style: TextStyle(color: Colors.orange),
                     ),
                   ),

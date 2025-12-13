@@ -29,7 +29,7 @@ class FirebaseService:
             if firebase_admin._apps:
                 self.db = firestore.client()
                 self.initialized = True
-                logger.info("✅ Firebase already initialized")
+                logger.info("âœ… Firebase already initialized")
                 return
             
             # Method 1: Try multiple secret file paths
@@ -42,12 +42,12 @@ class FirebaseService:
             
             for cred_path in possible_paths:
                 if os.path.exists(cred_path):
-                    logger.info(f"🔑 Found credentials at: {cred_path}")
+                    logger.info(f"ðŸ”‘ Found credentials at: {cred_path}")
                     cred = credentials.Certificate(cred_path)
                     firebase_admin.initialize_app(cred)
                     self.db = firestore.client()
                     self.initialized = True
-                    logger.info(f"✅ Firebase initialized from {cred_path}")
+                    logger.info(f"âœ… Firebase initialized from {cred_path}")
                     return
             
             # Method 2: Environment Variables
@@ -74,7 +74,7 @@ class FirebaseService:
                     firebase_admin.initialize_app(cred)
                     self.db = firestore.client()
                     self.initialized = True
-                    logger.info(f"✅ Firebase initialized with env vars for {project_id}")
+                    logger.info(f"âœ… Firebase initialized with env vars for {project_id}")
                     return
                 except json.JSONDecodeError:
                     if private_key and client_email:
@@ -89,14 +89,14 @@ class FirebaseService:
                         firebase_admin.initialize_app(cred)
                         self.db = firestore.client()
                         self.initialized = True
-                        logger.info(f"✅ Firebase initialized with env vars for {project_id}")
+                        logger.info(f"âœ… Firebase initialized with env vars for {project_id}")
                         return
             
-            logger.warning("⚠️ Firebase not initialized - no credentials found")
-            logger.warning(f"⚠️ Checked paths: {possible_paths}")
+            logger.warning("âš ï¸ Firebase not initialized - no credentials found")
+            logger.warning(f"âš ï¸ Checked paths: {possible_paths}")
             
         except Exception as e:
-            logger.error(f"❌ Firebase initialization error: {e}")
+            logger.error(f"âŒ Firebase initialization error: {e}")
             logger.exception("Full error:")
             self.initialized = False
     
@@ -116,7 +116,7 @@ class FirebaseService:
         Fetch similar DIODE LASER experiments from Firestore
         
         Args:
-            material_type: Material type (e.g., "Ahşap", "MDF")
+            material_type: Material type (e.g., "AhÅŸap", "MDF")
             thickness: Material thickness in mm
             thickness_tolerance: +/- tolerance for thickness matching
             min_results: Minimum number of results to return
@@ -177,14 +177,14 @@ class FirebaseService:
                     })
             
             logger.info(
-                f"📊 Found {len(experiments)} similar DIODE experiments for "
-                f"{material_type} {thickness}mm (±{thickness_tolerance}mm, ≤{max_laser_power}W)"
+                f"ðŸ“Š Found {len(experiments)} similar DIODE experiments for "
+                f"{material_type} {thickness}mm (Â±{thickness_tolerance}mm, â‰¤{max_laser_power}W)"
             )
             
             return experiments
             
         except Exception as e:
-            logger.error(f"❌ Error fetching experiments: {e}")
+            logger.error(f"âŒ Error fetching experiments: {e}")
             return []
     
     def get_all_verified_experiments(
@@ -234,19 +234,19 @@ class FirebaseService:
                 })
             
             logger.info(
-                f"📊 Fetched {len(experiments)} verified experiments "
+                f"ðŸ“Š Fetched {len(experiments)} verified experiments "
                 f"({'diode only' if only_diode else 'all types'})"
             )
             return experiments
             
         except Exception as e:
-            logger.error(f"❌ Error fetching all experiments: {e}")
+            logger.error(f"âŒ Error fetching all experiments: {e}")
             return []
     
     def get_training_data_for_transfer_learning(self, limit: int = 1000) -> List[Dict]:
         """
-        Transfer learning için format edilmiş eğitim verisi döndür
-        Her process type için ayrı satır oluşturur
+        Transfer learning iÃ§in format edilmiÅŸ eÄŸitim verisi dÃ¶ndÃ¼r
+        Her process type iÃ§in ayrÄ± satÄ±r oluÅŸturur
         
         Returns:
             List[Dict] with format:
@@ -284,12 +284,12 @@ class FirebaseService:
                 if not (2 <= laser_power <= 40):
                     continue
                 
-                # Her process type için ayrı eğitim örneği oluştur
+                # Her process type iÃ§in ayrÄ± eÄŸitim Ã¶rneÄŸi oluÅŸtur
                 processes = data.get('processes', {})
                 quality_scores = data.get('qualityScores', {})
                 
                 for process_type, process_params in processes.items():
-                    # Process params dict olmalı
+                    # Process params dict olmalÄ±
                     if not isinstance(process_params, dict):
                         continue
                     
@@ -312,7 +312,7 @@ class FirebaseService:
                     training_data.append(training_sample)
             
             logger.info(
-                f"📊 Prepared {len(training_data)} training samples "
+                f"ðŸ“Š Prepared {len(training_data)} training samples "
                 f"from {limit} experiment queries"
             )
             
@@ -332,7 +332,7 @@ class FirebaseService:
             return training_data
             
         except Exception as e:
-            logger.error(f"❌ Error fetching training data: {e}")
+            logger.error(f"âŒ Error fetching training data: {e}")
             logger.exception("Full error:")
             return []
 
@@ -401,7 +401,7 @@ class FirebaseService:
             }
             
         except Exception as e:
-            logger.error(f"❌ Error getting statistics: {e}")
+            logger.error(f"âŒ Error getting statistics: {e}")
             return {
                 'total_experiments': 0,
                 'verified_experiments': 0,
@@ -451,11 +451,11 @@ class FirebaseService:
             # Sort by count
             result.sort(key=lambda x: x['count'], reverse=True)
             
-            logger.info(f"📊 Found {len(result)} diode laser brands")
+            logger.info(f"ðŸ“Š Found {len(result)} diode laser brands")
             return result
             
         except Exception as e:
-            logger.error(f"❌ Error getting machine brands: {e}")
+            logger.error(f"âŒ Error getting machine brands: {e}")
             return []
 
 

@@ -18,8 +18,8 @@ class ModelStorageService:
     Firebase Storage for ML model persistence
     
     Usage:
-    - save_model_to_storage() → Upload model to Firebase Storage
-    - load_model_from_storage() → Download model from Firebase Storage
+    - save_model_to_storage() â†’ Upload model to Firebase Storage
+    - load_model_from_storage() â†’ Download model from Firebase Storage
     
     Storage Location:
     - Bucket: lasertuner-59b92.firebasestorage.app
@@ -43,11 +43,11 @@ class ModelStorageService:
             self.model_path = "ml_models/diode_laser_transfer_v1.h5"
             self.bucket_name = bucket_name
             
-            logger.info(f"✅ Firebase Storage initialized: {bucket_name}")
+            logger.info(f"âœ… Firebase Storage initialized: {bucket_name}")
             logger.info(f"   Model path: {self.model_path}")
             
         except Exception as e:
-            logger.error(f"❌ Firebase Storage init failed: {e}")
+            logger.error(f"âŒ Firebase Storage init failed: {e}")
             logger.exception("Full error:")
             self.bucket = None
             self.bucket_name = None
@@ -64,7 +64,7 @@ class ModelStorageService:
             True if model exists, False otherwise
         """
         if not self.is_available():
-            logger.warning("⚠️ Storage not available, cannot check model existence")
+            logger.warning("âš ï¸ Storage not available, cannot check model existence")
             return False
         
         try:
@@ -72,18 +72,18 @@ class ModelStorageService:
             exists = blob.exists()
             
             if exists:
-                logger.info(f"✅ Model found in storage: {self.model_path}")
+                logger.info(f"âœ… Model found in storage: {self.model_path}")
                 # Log size info
                 blob.reload()
                 size_mb = blob.size / 1024 / 1024
                 logger.info(f"   Size: {size_mb:.2f} MB")
             else:
-                logger.info(f"ℹ️ Model not found in storage: {self.model_path}")
+                logger.info(f"â„¹ï¸ Model not found in storage: {self.model_path}")
             
             return exists
             
         except Exception as e:
-            logger.error(f"❌ Storage check failed: {e}")
+            logger.error(f"âŒ Storage check failed: {e}")
             logger.exception("Full error:")
             return False
     
@@ -98,15 +98,15 @@ class ModelStorageService:
             True if successful, False otherwise
         """
         if not self.is_available():
-            logger.warning("⚠️ Firebase Storage not available")
+            logger.warning("âš ï¸ Firebase Storage not available")
             return False
         
         if not os.path.exists(local_model_path):
-            logger.error(f"❌ Local model not found: {local_model_path}")
+            logger.error(f"âŒ Local model not found: {local_model_path}")
             return False
         
         try:
-            logger.info(f"📤 Uploading model to Firebase Storage...")
+            logger.info(f"ðŸ“¤ Uploading model to Firebase Storage...")
             logger.info(f"   From: {local_model_path}")
             logger.info(f"   To: gs://{self.bucket_name}/{self.model_path}")
             
@@ -127,17 +127,17 @@ class ModelStorageService:
             
             # Verify upload
             if blob.exists():
-                logger.info(f"✅ Model uploaded successfully to Firebase Storage")
+                logger.info(f"âœ… Model uploaded successfully to Firebase Storage")
                 logger.info(f"   Path: {self.model_path}")
                 logger.info(f"   Size: {file_size / 1024 / 1024:.2f} MB")
                 logger.info(f"   Public URL: https://firebasestorage.googleapis.com/v0/b/{self.bucket_name}/o/{self.model_path.replace('/', '%2F')}?alt=media")
                 return True
             else:
-                logger.error("❌ Upload failed: Model not found after upload")
+                logger.error("âŒ Upload failed: Model not found after upload")
                 return False
             
         except Exception as e:
-            logger.error(f"❌ Model upload failed: {e}")
+            logger.error(f"âŒ Model upload failed: {e}")
             logger.exception("Full error:")
             return False
     
@@ -152,18 +152,18 @@ class ModelStorageService:
             True if successful, False otherwise
         """
         if not self.is_available():
-            logger.warning("⚠️ Firebase Storage not available")
+            logger.warning("âš ï¸ Firebase Storage not available")
             return False
         
         try:
-            logger.info(f"📥 Downloading model from Firebase Storage...")
+            logger.info(f"ðŸ“¥ Downloading model from Firebase Storage...")
             logger.info(f"   From: gs://{self.bucket_name}/{self.model_path}")
             logger.info(f"   To: {local_model_path}")
             
             blob = self.bucket.blob(self.model_path)
             
             if not blob.exists():
-                logger.warning(f"⚠️ Model not found in storage: {self.model_path}")
+                logger.warning(f"âš ï¸ Model not found in storage: {self.model_path}")
                 return False
             
             # Create local directory if needed
@@ -178,16 +178,16 @@ class ModelStorageService:
             # Verify download
             if os.path.exists(local_model_path):
                 file_size = os.path.getsize(local_model_path)
-                logger.info(f"✅ Model downloaded successfully from Firebase Storage")
+                logger.info(f"âœ… Model downloaded successfully from Firebase Storage")
                 logger.info(f"   Saved to: {local_model_path}")
                 logger.info(f"   Size: {file_size / 1024 / 1024:.2f} MB")
                 return True
             else:
-                logger.error("❌ Download failed: File not found after download")
+                logger.error("âŒ Download failed: File not found after download")
                 return False
             
         except Exception as e:
-            logger.error(f"❌ Model download failed: {e}")
+            logger.error(f"âŒ Model download failed: {e}")
             logger.exception("Full error:")
             return False
     
@@ -205,7 +205,7 @@ class ModelStorageService:
             blob = self.bucket.blob(self.model_path)
             
             if not blob.exists():
-                logger.info("ℹ️ Model not found in storage, no metadata available")
+                logger.info("â„¹ï¸ Model not found in storage, no metadata available")
                 return None
             
             # Refresh metadata from storage
@@ -225,14 +225,14 @@ class ModelStorageService:
                 'public_url': f"https://firebasestorage.googleapis.com/v0/b/{self.bucket_name}/o/{self.model_path.replace('/', '%2F')}?alt=media"
             }
             
-            logger.info(f"📊 Model metadata retrieved:")
+            logger.info(f"ðŸ“Š Model metadata retrieved:")
             logger.info(f"   Size: {metadata['size_mb']:.2f} MB")
             logger.info(f"   Updated: {metadata['updated']}")
             
             return metadata
             
         except Exception as e:
-            logger.error(f"❌ Metadata fetch failed: {e}")
+            logger.error(f"âŒ Metadata fetch failed: {e}")
             logger.exception("Full error:")
             return None
     
@@ -244,23 +244,23 @@ class ModelStorageService:
             True if successful, False otherwise
         """
         if not self.is_available():
-            logger.warning("⚠️ Firebase Storage not available")
+            logger.warning("âš ï¸ Firebase Storage not available")
             return False
         
         try:
             blob = self.bucket.blob(self.model_path)
             
             if not blob.exists():
-                logger.info("ℹ️ Model not found in storage, nothing to delete")
+                logger.info("â„¹ï¸ Model not found in storage, nothing to delete")
                 return True
             
             blob.delete()
             
-            logger.info(f"✅ Model deleted from Firebase Storage: {self.model_path}")
+            logger.info(f"âœ… Model deleted from Firebase Storage: {self.model_path}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Model deletion failed: {e}")
+            logger.error(f"âŒ Model deletion failed: {e}")
             logger.exception("Full error:")
             return False
     
@@ -296,7 +296,7 @@ def get_storage_service(bucket_name: Optional[str] = None) -> ModelStorageServic
     global _storage_service
     if _storage_service is None:
         _storage_service = ModelStorageService(bucket_name)
-        logger.info("📦 Model Storage Service singleton created")
+        logger.info("ðŸ“¦ Model Storage Service singleton created")
     return _storage_service
 
 
@@ -304,4 +304,4 @@ def reset_storage_service():
     """Reset storage service singleton (useful for testing)"""
     global _storage_service
     _storage_service = None
-    logger.info("🔄 Model Storage Service singleton reset")
+    logger.info("ðŸ”„ Model Storage Service singleton reset")

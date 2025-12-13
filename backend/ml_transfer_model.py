@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Hybrid Transfer Learning Model for Diode Laser Parameter Prediction
-Combines Image Features (CNN) + Numerical Features (Physical Properties)
+Transfer Learning Model for Diode Laser Parameter Prediction
+Uses only numerical features (no images)
+Trained on Firebase crowdsourced data
 """
 
 import numpy as np
@@ -15,174 +16,104 @@ logger = logging.getLogger(__name__)
 try:
     import tensorflow as tf
     from tensorflow.keras.models import Model
-    from tensorflow.keras.layers import (
-        Input, Dense, Dropout, BatchNormalization, Concatenate,
-        GlobalAveragePooling2D, Conv2D, MaxPooling2D
-    )
-    from tensorflow.keras.applications import EfficientNetB0
+    from tensorflow.keras.layers import Input, Dense, Dropout, BatchNormalization
     from tensorflow.keras.optimizers import Adam
-    from tensorflow.keras.callbacks import (
-        EarlyStopping, ReduceLROnPlateau, ModelCheckpoint, TensorBoard
-    )
+    from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, ModelCheckpoint
     TF_AVAILABLE = True
-    logger.info("✅ TensorFlow available for transfer learning")
+    logger.info("âœ… TensorFlow available for transfer learning")
 except ImportError:
     TF_AVAILABLE = False
-    logger.warning("⚠️ TensorFlow not available, transfer learning disabled")
+    logger.warning("âš ï¸ TensorFlow not available, transfer learning disabled")
 
 
-class HybridDiodeLaserModel:
+class DiodeLaserTransferModel:
     """
-    🔥 HYBRID TRANSFER LEARNING MODEL
+    Transfer Learning Model for Diode Laser
     
     Architecture:
-    ┌─────────────────────────────────────────┐
-    │  INPUT 1: Image (224x224x3)            │
-    │    ↓                                    │
-    │  EfficientNetB0 (ImageNet pre-trained) │
-    │    ↓                                    │
-    │  GlobalAveragePooling                   │
-    │    ↓                                    │
-    │  Dense(128) - Image Features            │
-    └─────────────────────────────────────────┘
-                    ↓
-    ┌─────────────────────────────────────────┐
-    │  INPUT 2: Numerical (9 features)       │
-    │    ↓                                    │
-    │  Dense(64) - Physical Features          │
-    └─────────────────────────────────────────┘
-                    ↓
-    ┌─────────────────────────────────────────┐
-    │  FUSION: Concatenate                    │
-    │    ↓                                    │
-    │  Dense(256) + BN + Dropout              │
-    │  Dense(128) + BN + Dropout              │
-    │  Dense(64) + BN + Dropout               │
-    └─────────────────────────────────────────┘
-                    ↓
-    ┌─────────────────────────────────────────┐
-    │  OUTPUT HEADS (Multi-task)              │
-    │    ├─ Power Head → Dense(32) → Output   │
-    │    ├─ Speed Head → Dense(32) → Output   │
-    │    └─ Passes Head → Dense(16) → Output  │
-    └─────────────────────────────────────────┘
+    - Input: 9 numerical features (material properties + process type)
+    - Deep MLP with transfer learning layers
+    - Multi-output regression (power, speed, passes)
+    
+    Transfer Learning Strategy:
+    1. Pre-train on synthetic/physics-based data (optional)
+    2. Fine-tune on real experimental data (Firebase crowdsourced)
+    3. Continuous online learning with new data
     """
     
-    def __init__(
-        self, 
-        model_path: Optional[str] = None,
-        use_images: bool = True,
-        image_shape: Tuple[int, int, int] = (224, 224, 3)
-    ):
+    def __init__(self, model_path: Optional[str] = None):
         if not TF_AVAILABLE:
-            raise RuntimeError("TensorFlow not available")
+            raise RuntimeError("TensorFlow not available, cannot use transfer learning")
         
         self.model = None
         self.history = None
         self.is_trained = False
-        self.use_images = use_images
-        self.image_shape = image_shape
-        self.version = "2.0.0"  # Hybrid version
         
         if model_path and os.path.exists(model_path):
             self.load_model(model_path)
             self.is_trained = True
-            logger.info(f"✅ Loaded hybrid model from {model_path}")
+            logger.info(f"âœ… Loaded pre-trained model from {model_path}")
         else:
-            self.model = self._build_hybrid_model()
-            logger.info(f"✅ Built new hybrid model (images={'ON' if use_images else 'OFF'})")
+            self.model = self._build_model()
+            logger.info("âœ… Built new transfer learning model architecture")
     
-    def _build_hybrid_model(self) -> Model:
+    def _build_model(self) -> Model:
         """
-        Build Hybrid CNN + MLP Model
+        Build deep MLP for transfer learning
+        
+        Architecture:
+        - Deep feature extraction layers (transfer learning component)
+        - Batch normalization for stable training
+        - Dropout for regularization
+        - Task-specific output heads (fine-tuning component)
         """
-        inputs = []
-        feature_branches = []
+        # Input layer (9 numerical features)
+        input_features = Input(shape=(9,), name='physical_features')
         
-        # ===== BRANCH 1: IMAGE FEATURES (CNN) =====
-        if self.use_images:
-            image_input = Input(shape=self.image_shape, name='image_input')
-            inputs.append(image_input)
-            
-            # Pre-trained EfficientNetB0 (ImageNet weights)
-            base_cnn = EfficientNetB0(
-                weights='imagenet',
-                include_top=False,
-                input_tensor=image_input
-            )
-            
-            # Freeze early layers (transfer learning)
-            for layer in base_cnn.layers[:100]:  # Freeze first 100 layers
-                layer.trainable = False
-            
-            # Image feature extraction
-            x_img = GlobalAveragePooling2D(name='image_pool')(base_cnn.output)
-            x_img = Dense(128, activation='relu', name='image_dense')(x_img)
-            x_img = BatchNormalization(name='image_bn')(x_img)
-            x_img = Dropout(0.3, name='image_dropout')(x_img)
-            
-            feature_branches.append(x_img)
-            logger.info("   🖼️ Image branch: EfficientNetB0 (pre-trained)")
+        # ===== TRANSFER LEARNING LAYERS (Feature Extraction) =====
+        x = Dense(256, activation='relu', name='transfer_dense_1')(input_features)
+        x = BatchNormalization(name='transfer_bn_1')(x)
+        x = Dropout(0.3, name='transfer_dropout_1')(x)
         
-        # ===== BRANCH 2: NUMERICAL FEATURES (MLP) =====
-        numerical_input = Input(shape=(9,), name='numerical_input')
-        inputs.append(numerical_input)
+        x = Dense(128, activation='relu', name='transfer_dense_2')(x)
+        x = BatchNormalization(name='transfer_bn_2')(x)
+        x = Dropout(0.2, name='transfer_dropout_2')(x)
         
-        x_num = Dense(64, activation='relu', name='numerical_dense_1')(numerical_input)
-        x_num = BatchNormalization(name='numerical_bn_1')(x_num)
-        x_num = Dropout(0.2, name='numerical_dropout_1')(x_num)
+        x = Dense(64, activation='relu', name='transfer_dense_3')(x)
+        x = BatchNormalization(name='transfer_bn_3')(x)
+        x = Dropout(0.1, name='transfer_dropout_3')(x)
         
-        x_num = Dense(32, activation='relu', name='numerical_dense_2')(x_num)
-        x_num = BatchNormalization(name='numerical_bn_2')(x_num)
-        
-        feature_branches.append(x_num)
-        logger.info("   🔢 Numerical branch: Deep MLP")
-        
-        # ===== FUSION LAYER =====
-        if len(feature_branches) > 1:
-            combined = Concatenate(name='fusion')(feature_branches)
-            logger.info("   🔗 Fusion: Image + Numerical features")
-        else:
-            combined = feature_branches[0]
-            logger.info("   🔗 Using only numerical features")
-        
-        # ===== SHARED REPRESENTATION LEARNING =====
-        x = Dense(256, activation='relu', name='shared_dense_1')(combined)
-        x = BatchNormalization(name='shared_bn_1')(x)
-        x = Dropout(0.3, name='shared_dropout_1')(x)
-        
-        x = Dense(128, activation='relu', name='shared_dense_2')(x)
-        x = BatchNormalization(name='shared_bn_2')(x)
-        x = Dropout(0.2, name='shared_dropout_2')(x)
-        
-        x = Dense(64, activation='relu', name='shared_dense_3')(x)
-        x = BatchNormalization(name='shared_bn_3')(x)
-        x = Dropout(0.1, name='shared_dropout_3')(x)
-        
-        # ===== MULTI-TASK OUTPUT HEADS =====
+        # ===== TASK-SPECIFIC OUTPUT HEADS =====
         # Power prediction head
-        power_head = Dense(32, activation='relu', name='power_head')(x)
+        power_head = Dense(32, activation='relu', name='power_head_dense')(x)
         power_output = Dense(1, activation='sigmoid', name='power')(power_head)
         
         # Speed prediction head
-        speed_head = Dense(32, activation='relu', name='speed_head')(x)
+        speed_head = Dense(32, activation='relu', name='speed_head_dense')(x)
         speed_output = Dense(1, activation='sigmoid', name='speed')(speed_head)
         
         # Passes prediction head
-        passes_head = Dense(16, activation='relu', name='passes_head')(x)
+        passes_head = Dense(16, activation='relu', name='passes_head_dense')(x)
         passes_output = Dense(1, activation='sigmoid', name='passes')(passes_head)
         
         # Build model
         model = Model(
-            inputs=inputs,
+            inputs=input_features,
             outputs=[power_output, speed_output, passes_output],
-            name=f'hybrid_diode_laser_v{self.version}'
+            name='diode_laser_transfer_model'
         )
         
         return model
     
     def compile_model(self, learning_rate: float = 0.001):
-        """Compile with multi-output loss"""
+        """
+        Compile model with multi-output loss
+        
+        Loss weights:
+        - Power: Most critical (1.0)
+        - Speed: Critical (1.0)
+        - Passes: Less critical (0.5)
+        """
         self.model.compile(
             optimizer=Adam(learning_rate=learning_rate),
             loss={
@@ -191,9 +122,9 @@ class HybridDiodeLaserModel:
                 'passes': 'mse'
             },
             loss_weights={
-                'power': 1.0,    # Most critical
-                'speed': 1.0,    # Critical
-                'passes': 0.5    # Less critical
+                'power': 1.0,
+                'speed': 1.0,
+                'passes': 0.5
             },
             metrics={
                 'power': ['mae', 'mse'],
@@ -201,44 +132,35 @@ class HybridDiodeLaserModel:
                 'passes': ['mae']
             }
         )
-        logger.info(f"✅ Model compiled (lr={learning_rate})")
+        logger.info(f"âœ… Model compiled with learning_rate={learning_rate}")
     
-    def train(
-        self, 
-        X_numerical: np.ndarray,
-        y_power: np.ndarray, 
-        y_speed: np.ndarray,
-        y_passes: np.ndarray,
-        X_images: Optional[np.ndarray] = None,
-        epochs: int = 100,
-        validation_split: float = 0.2,
-        save_path: Optional[str] = None
-    ) -> Dict:
+    def train(self, X: np.ndarray, y_power: np.ndarray, y_speed: np.ndarray, 
+              y_passes: np.ndarray, epochs: int = 100, validation_split: float = 0.2,
+              save_path: Optional[str] = None) -> Dict:
         """
-        Train hybrid model
+        Train model from scratch with Firebase data
         
         Args:
-            X_numerical: Numerical features (N, 9)
-            y_power, y_speed, y_passes: Targets (N, 1) normalized 0-1
-            X_images: Images (N, 224, 224, 3) or None
+            X: Features (N, 9)
+            y_power: Power targets normalized 0-1 (N, 1)
+            y_speed: Speed targets normalized 0-1 (N, 1)
+            y_passes: Passes targets normalized 0-1 (N, 1)
             epochs: Training epochs
             validation_split: Validation ratio
             save_path: Path to save best model
+        
+        Returns:
+            Training history dict
         """
-        logger.info(f"🔄 Training hybrid model...")
-        logger.info(f"   Numerical: {X_numerical.shape}")
-        if X_images is not None:
-            logger.info(f"   Images: {X_images.shape}")
+        if self.model is None:
+            raise ValueError("Model not built")
+        
+        logger.info(f"ðŸ”„ Training model with {len(X)} samples...")
+        logger.info(f"   Features shape: {X.shape}")
+        logger.info(f"   Targets: power {y_power.shape}, speed {y_speed.shape}, passes {y_passes.shape}")
         
         self.compile_model()
         
-        # Prepare inputs
-        if self.use_images and X_images is not None:
-            X_input = [X_images, X_numerical]
-        else:
-            X_input = X_numerical
-        
-        # Callbacks
         callbacks = [
             EarlyStopping(
                 monitor='val_loss',
@@ -249,7 +171,7 @@ class HybridDiodeLaserModel:
             ReduceLROnPlateau(
                 monitor='val_loss',
                 factor=0.5,
-                patience=7,
+                patience=5,
                 min_lr=1e-6,
                 verbose=1
             )
@@ -265,100 +187,84 @@ class HybridDiodeLaserModel:
                     verbose=1
                 )
             )
-            
-            # TensorBoard logs
-            log_dir = os.path.join(
-                os.path.dirname(save_path),
-                'logs',
-                f'run_{tf.timestamp()}'
-            )
-            callbacks.append(TensorBoard(log_dir=log_dir, histogram_freq=1))
         
-        # Train
         history = self.model.fit(
-            X_input,
+            X,
             {'power': y_power, 'speed': y_speed, 'passes': y_passes},
             epochs=epochs,
             validation_split=validation_split,
             callbacks=callbacks,
-            batch_size=min(32, len(X_numerical) // 4),
+            batch_size=min(32, len(X) // 4),
             verbose=1
         )
         
         self.history = history
         self.is_trained = True
+        logger.info("âœ… Training completed successfully")
         
         # Log final metrics
         final_metrics = {k: v[-1] for k, v in history.history.items() if 'val' in k}
-        logger.info(f"✅ Training complete: {final_metrics}")
+        logger.info(f"ðŸ“Š Final validation metrics: {final_metrics}")
         
         return history.history
     
-    def fine_tune(
-        self,
-        X_numerical: np.ndarray,
-        y_power: np.ndarray,
-        y_speed: np.ndarray,
-        y_passes: np.ndarray,
-        X_images: Optional[np.ndarray] = None,
-        freeze_cnn: bool = True,
-        epochs: int = 50
-    ) -> Dict:
+    def fine_tune(self, X: np.ndarray, y_power: np.ndarray, y_speed: np.ndarray,
+                  y_passes: np.ndarray, freeze_layers: int = 3, epochs: int = 50):
         """
-        Fine-tune with new data
+        Fine-tune pre-trained model with new Firebase data
         
         Strategy:
-        1. Freeze CNN (if images used)
-        2. Train MLP + output heads (moderate LR)
-        3. Optionally unfreeze CNN
-        4. Full fine-tune (low LR)
+        1. Freeze early layers (general feature extraction)
+        2. Train with moderate learning rate
+        3. Unfreeze all layers
+        4. Train with low learning rate (fine-tuning)
+        
+        Args:
+            X: New features (N, 9)
+            y_power, y_speed, y_passes: New targets (N, 1)
+            freeze_layers: Number of early layers to freeze initially
+            epochs: Fine-tuning epochs
         """
-        logger.info(f"🔧 Fine-tuning hybrid model...")
-        logger.info(f"   New samples: {len(X_numerical)}")
-        logger.info(f"   Freeze CNN: {freeze_cnn}")
+        logger.info(f"ðŸ”§ Fine-tuning model with {len(X)} new samples...")
+        logger.info(f"   Strategy: Freeze first {freeze_layers} layers â†’ train â†’ unfreeze â†’ fine-tune")
         
-        # Prepare inputs
-        if self.use_images and X_images is not None:
-            X_input = [X_images, X_numerical]
-        else:
-            X_input = X_numerical
+        # ===== PHASE 1: Frozen Transfer Learning =====
+        logger.info("ðŸ”Œ Phase 1: Freezing transfer layers...")
+        frozen_count = 0
+        for layer in self.model.layers:
+            if 'transfer' in layer.name and frozen_count < freeze_layers:
+                layer.trainable = False
+                frozen_count += 1
+                logger.info(f"   â„ï¸ Frozen: {layer.name}")
         
-        # ===== PHASE 1: Frozen CNN (if applicable) =====
-        if self.use_images and freeze_cnn:
-            logger.info("🔒 Phase 1: Freezing CNN layers...")
-            for layer in self.model.layers:
-                if 'efficientnet' in layer.name.lower() or 'image' in layer.name:
-                    layer.trainable = False
-                    logger.info(f"   ❄️ Frozen: {layer.name}")
-            
-            self.compile_model(learning_rate=0.001)
-            
-            logger.info("🔄 Phase 1: Training MLP + heads...")
-            self.model.fit(
-                X_input,
-                {'power': y_power, 'speed': y_speed, 'passes': y_passes},
-                epochs=epochs // 2,
-                validation_split=0.2,
-                batch_size=min(32, len(X_numerical) // 4),
-                verbose=0
-            )
+        self.compile_model(learning_rate=0.001)
         
-        # ===== PHASE 2: Full fine-tuning =====
-        logger.info("🔓 Phase 2: Unfreezing all layers...")
+        logger.info("ðŸ”„ Phase 1: Training with frozen layers...")
+        self.model.fit(
+            X,
+            {'power': y_power, 'speed': y_speed, 'passes': y_passes},
+            epochs=epochs // 2,
+            validation_split=0.2,
+            batch_size=min(32, len(X) // 4),
+            verbose=0
+        )
+        
+        # ===== PHASE 2: Full Fine-Tuning =====
+        logger.info("ðŸ”“ Phase 2: Unfreezing all layers...")
         for layer in self.model.layers:
             if not layer.trainable:
                 layer.trainable = True
-                logger.info(f"   ✅ Unfrozen: {layer.name}")
+                logger.info(f"   âœ… Unfrozen: {layer.name}")
         
         self.compile_model(learning_rate=0.0001)
         
-        logger.info("🔄 Phase 2: Full fine-tuning...")
+        logger.info("ðŸ”„ Phase 2: Fine-tuning all layers...")
         history = self.model.fit(
-            X_input,
+            X,
             {'power': y_power, 'speed': y_speed, 'passes': y_passes},
             epochs=epochs,
             validation_split=0.2,
-            batch_size=min(32, len(X_numerical) // 4),
+            batch_size=min(32, len(X) // 4),
             callbacks=[
                 EarlyStopping(patience=10, restore_best_weights=True, verbose=1)
             ],
@@ -366,103 +272,59 @@ class HybridDiodeLaserModel:
         )
         
         self.is_trained = True
-        logger.info(f"✅ Fine-tuning complete: val_loss={history.history['val_loss'][-1]:.4f}")
+        logger.info("âœ… Fine-tuning completed successfully")
+        
+        # Log improvement
+        final_loss = history.history['val_loss'][-1]
+        logger.info(f"ðŸ“Š Final validation loss after fine-tuning: {final_loss:.4f}")
         
         return history.history
     
-    def predict(
-        self,
-        X_numerical: np.ndarray,
-        X_images: Optional[np.ndarray] = None
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def predict(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Predict parameters
         
         Args:
-            X_numerical: Features (N, 9)
-            X_images: Images (N, 224, 224, 3) or None
+            X: Features (N, 9) - normalized
         
         Returns:
-            (power, speed, passes) each (N, 1) normalized 0-1
+            (power, speed, passes) each shape (N, 1) - normalized 0-1
         """
         if not self.is_trained:
-            logger.warning("⚠️ Model not trained, predictions may be random")
+            logger.warning("âš ï¸ Model not trained yet, predictions may be random")
         
-        if self.use_images and X_images is not None:
-            X_input = [X_images, X_numerical]
-        else:
-            X_input = X_numerical
-        
-        predictions = self.model.predict(X_input, verbose=0)
+        predictions = self.model.predict(X, verbose=0)
         return predictions[0], predictions[1], predictions[2]
     
-    def evaluate(
-        self,
-        X_numerical: np.ndarray,
-        y_power: np.ndarray,
-        y_speed: np.ndarray,
-        y_passes: np.ndarray,
-        X_images: Optional[np.ndarray] = None
-    ) -> Dict:
-        """Evaluate model performance"""
-        if self.use_images and X_images is not None:
-            X_input = [X_images, X_numerical]
-        else:
-            X_input = X_numerical
+    def evaluate(self, X: np.ndarray, y_power: np.ndarray, y_speed: np.ndarray,
+                 y_passes: np.ndarray) -> Dict:
+        """
+        Evaluate model performance
         
+        Returns:
+            Dict with metrics: loss, mae, mse for each output
+        """
         results = self.model.evaluate(
-            X_input,
+            X,
             {'power': y_power, 'speed': y_speed, 'passes': y_passes},
             verbose=0,
             return_dict=True
         )
         
-        logger.info(f"📊 Evaluation: {results}")
+        logger.info(f"ðŸ“Š Evaluation results: {results}")
         return results
     
     def save_model(self, path: str):
-        """Save model with metadata"""
+        """Save model to file"""
         os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
         self.model.save(path)
-        
-        # Save metadata
-        metadata = {
-            'version': self.version,
-            'use_images': self.use_images,
-            'image_shape': self.image_shape,
-            'is_trained': self.is_trained,
-            'timestamp': str(tf.timestamp().numpy())
-        }
-        
-        import json
-        metadata_path = path.replace('.h5', '_metadata.json')
-        with open(metadata_path, 'w') as f:
-            json.dump(metadata, f, indent=2)
-        
-        logger.info(f"💾 Model saved: {path}")
-        logger.info(f"💾 Metadata saved: {metadata_path}")
+        logger.info(f"ðŸ’¾ Model saved to {path}")
     
     def load_model(self, path: str):
-        """Load model with metadata"""
+        """Load model from file"""
         self.model = tf.keras.models.load_model(path)
         self.is_trained = True
-        
-        # Load metadata if exists
-        metadata_path = path.replace('.h5', '_metadata.json')
-        if os.path.exists(metadata_path):
-            import json
-            with open(metadata_path, 'r') as f:
-                metadata = json.load(f)
-            
-            self.version = metadata.get('version', '1.0.0')
-            self.use_images = metadata.get('use_images', False)
-            self.image_shape = tuple(metadata.get('image_shape', (224, 224, 3)))
-            
-            logger.info(f"📂 Model loaded: {path}")
-            logger.info(f"   Version: {self.version}")
-            logger.info(f"   Images: {self.use_images}")
-        else:
-            logger.warning("⚠️ Metadata not found, using defaults")
+        logger.info(f"ðŸ“‚ Model loaded from {path}")
     
     def get_model_summary(self) -> str:
         """Get model architecture summary"""
@@ -472,34 +334,22 @@ class HybridDiodeLaserModel:
         return stream.getvalue()
 
 
-# ===== GLOBAL INSTANCE =====
-_hybrid_model = None
+# Global instance
+_transfer_model = None
 
-def get_hybrid_model(
-    model_path: Optional[str] = None,
-    use_images: bool = False  # Default OFF (numerical only)
-) -> Optional[HybridDiodeLaserModel]:
-    """Get or create hybrid model singleton"""
-    global _hybrid_model
+def get_transfer_model(model_path: Optional[str] = None) -> Optional[DiodeLaserTransferModel]:
+    """Get or create transfer model singleton"""
+    global _transfer_model
     
     if not TF_AVAILABLE:
-        logger.warning("⚠️ TensorFlow not available")
+        logger.warning("âš ï¸ TensorFlow not available, transfer learning disabled")
         return None
     
-    if _hybrid_model is None:
+    if _transfer_model is None:
         try:
-            _hybrid_model = HybridDiodeLaserModel(
-                model_path=model_path,
-                use_images=use_images
-            )
+            _transfer_model = DiodeLaserTransferModel(model_path)
         except Exception as e:
-            logger.error(f"❌ Failed to create hybrid model: {e}")
+            logger.error(f"âŒ Failed to create transfer model: {e}")
             return None
     
-    return _hybrid_model
-
-
-# ===== BACKWARD COMPATIBILITY =====
-# Keep old function names for existing code
-DiodeLaserTransferModel = HybridDiodeLaserModel
-get_transfer_model = get_hybrid_model
+    return _transfer_model

@@ -43,7 +43,7 @@ class PredictionResponse {
   final String notes;
   final int dataPointsUsed;
   final String dataSource;
-  final List<String> warnings; // ✅ YENİ
+  final List<String> warnings; // âœ… YENÄ°
 
   PredictionResponse({
     required this.predictions,
@@ -51,7 +51,7 @@ class PredictionResponse {
     required this.notes,
     required this.dataPointsUsed,
     required this.dataSource,
-    this.warnings = const [], // ✅ YENİ
+    this.warnings = const [], // âœ… YENÄ°
   });
 
   factory PredictionResponse.fromMap(Map<String, dynamic> map) {
@@ -69,7 +69,7 @@ class PredictionResponse {
       notes: map['notes'] ?? '',
       dataPointsUsed: map['dataPointsUsed'] ?? 0,
       dataSource: map['dataSource'] ?? 'static_algorithm',
-      warnings: List<String>.from(map['warnings'] ?? []), // ✅ YENİ
+      warnings: List<String>.from(map['warnings'] ?? []), // âœ… YENÄ°
     );
   }
 
@@ -85,27 +85,27 @@ class PredictionResponse {
       'notes': notes,
       'dataPointsUsed': dataPointsUsed,
       'dataSource': dataSource,
-      'warnings': warnings, // ✅ YENİ
+      'warnings': warnings, // âœ… YENÄ°
     };
   }
 
-  // ✅ YENİ: Veri kaynağına göre ikon
+  // âœ… YENÄ°: Veri kaynaÄŸÄ±na gÃ¶re ikon
   IconData getDataSourceIcon() {
     switch (dataSource) {
-      case 'transfer_learning': // Backend'den gelen değer
+      case 'transfer_learning': // Backend'den gelen deÄŸer
         return Icons.psychology;
       case 'static_algorithm':
         return Icons.calculate;
       case 'gemini_ai':
         return Icons.auto_awesome;
-      case 'fallback': // Backend'den gelen değer
+      case 'fallback': // Backend'den gelen deÄŸer
         return Icons.engineering;
       default:
         return Icons.info;
     }
   }
 
-  // ✅ YENİ: Veri kaynağına göre renk
+  // âœ… YENÄ°: Veri kaynaÄŸÄ±na gÃ¶re renk
   Color getDataSourceColor() {
     switch (dataSource) {
       case 'transfer_learning':
@@ -121,34 +121,34 @@ class PredictionResponse {
     }
   }
 
-  // ✅ GÜNCELLENDİ: Veri kaynağına göre açıklama
+  // âœ… GÃœNCELLENDÄ°: Veri kaynaÄŸÄ±na gÃ¶re aÃ§Ä±klama
   String getDataSourceDescription() {
     switch (dataSource) {
       case 'transfer_learning':
-        return '🤖 Transfer learning model (Firebase verisi ile eğitildi)';
+        return 'ðŸ¤– Transfer learning model (Firebase verisi ile eÄŸitildi)';
       case 'static_algorithm':
-        return '⚙️ Statik algoritma (Model henüz eğitilmedi veya yeterli veri yok)';
+        return 'âš™ï¸ Statik algoritma (Model henÃ¼z eÄŸitilmedi veya yeterli veri yok)';
       case 'gemini_ai':
-        return '🌟 Gemini AI ile tahmin edildi';
+        return 'ðŸŒŸ Gemini AI ile tahmin edildi';
       case 'fallback':
-        return '⚠️ Fallback algoritma (API geçici olarak kullanılamıyor)';
+        return 'âš ï¸ Fallback algoritma (API geÃ§ici olarak kullanÄ±lamÄ±yor)';
       default:
-        return '📊 Tahmin tamamlandı';
+        return 'ðŸ“Š Tahmin tamamlandÄ±';
     }
   }
 
-  // ✅ YENİ: Güvenilirlik seviyesi
+  // âœ… YENÄ°: GÃ¼venilirlik seviyesi
   String getConfidenceLevel() {
     if (confidenceScore >= 0.80) {
-      return 'Yüksek Güvenilirlik';
+      return 'YÃ¼ksek GÃ¼venilirlik';
     } else if (confidenceScore >= 0.65) {
-      return 'Orta Güvenilirlik';
+      return 'Orta GÃ¼venilirlik';
     } else {
-      return 'Düşük Güvenilirlik';
+      return 'DÃ¼ÅŸÃ¼k GÃ¼venilirlik';
     }
   }
 
-  // ✅ YENİ: Güvenilirlik rengi
+  // âœ… YENÄ°: GÃ¼venilirlik rengi
   Color getConfidenceColor() {
     if (confidenceScore >= 0.80) {
       return Colors.green;
@@ -159,39 +159,39 @@ class PredictionResponse {
     }
   }
 
-  // ✅ YENİ: Veri kaynağı öncelik sırası (karşılaştırma için)
+  // âœ… YENÄ°: Veri kaynaÄŸÄ± Ã¶ncelik sÄ±rasÄ± (karÅŸÄ±laÅŸtÄ±rma iÃ§in)
   int getDataSourcePriority() {
     switch (dataSource) {
       case 'transfer_learning':
-        return 1; // En yüksek öncelik
+        return 1; // En yÃ¼ksek Ã¶ncelik
       case 'gemini_ai':
         return 2;
       case 'static_algorithm':
         return 3;
       case 'fallback':
-        return 4; // En düşük öncelik
+        return 4; // En dÃ¼ÅŸÃ¼k Ã¶ncelik
       default:
         return 5;
     }
   }
 
-  // ✅ YENİ: Veri kaynağı güvenilir mi?
+  // âœ… YENÄ°: Veri kaynaÄŸÄ± gÃ¼venilir mi?
   bool isReliableSource() {
     return dataSource == 'transfer_learning' || dataSource == 'gemini_ai';
   }
 
-  // ✅ YENİ: Uyarı var mı?
+  // âœ… YENÄ°: UyarÄ± var mÄ±?
   bool hasWarnings() {
     return warnings.isNotEmpty;
   }
 
-  // ✅ YENİ: Kritik uyarı var mı? (⚠️ ile başlayan)
+  // âœ… YENÄ°: Kritik uyarÄ± var mÄ±? (âš ï¸ ile baÅŸlayan)
   bool hasCriticalWarnings() {
-    return warnings.any((warning) => warning.startsWith('⚠️'));
+    return warnings.any((warning) => warning.startsWith('âš ï¸'));
   }
 }
 
-// API sağlık durumu
+// API saÄŸlÄ±k durumu
 class ApiHealthStatus {
   final bool isHealthy;
   final String? errorMessage;
@@ -199,8 +199,8 @@ class ApiHealthStatus {
   final Map<String, dynamic>? details;
   final bool firebaseConnected;
   final int totalExperiments;
-  final bool transferLearningEnabled; // ✅ YENİ
-  final bool transferLearningTrained; // ✅ YENİ
+  final bool transferLearningEnabled; // âœ… YENÄ°
+  final bool transferLearningTrained; // âœ… YENÄ°
 
   ApiHealthStatus({
     required this.isHealthy,
@@ -209,8 +209,8 @@ class ApiHealthStatus {
     this.details,
     this.firebaseConnected = false,
     this.totalExperiments = 0,
-    this.transferLearningEnabled = false, // ✅ YENİ
-    this.transferLearningTrained = false, // ✅ YENİ
+    this.transferLearningEnabled = false, // âœ… YENÄ°
+    this.transferLearningTrained = false, // âœ… YENÄ°
   });
 
   factory ApiHealthStatus.fromMap(Map<String, dynamic> map) {
@@ -221,27 +221,27 @@ class ApiHealthStatus {
       firebaseConnected: map['firebase_status'] == 'connected',
       totalExperiments: map['total_experiments'] ?? 0,
       transferLearningEnabled:
-          map['transfer_learning_enabled'] ?? false, // ✅ YENİ
+          map['transfer_learning_enabled'] ?? false, // âœ… YENÄ°
       transferLearningTrained:
-          map['transfer_learning_trained'] ?? false, // ✅ YENİ
+          map['transfer_learning_trained'] ?? false, // âœ… YENÄ°
     );
   }
 
-  // ✅ YENİ: Model durumu mesajı
+  // âœ… YENÄ°: Model durumu mesajÄ±
   String getModelStatusMessage() {
     if (!transferLearningEnabled) {
-      return 'Transfer Learning kapalı';
+      return 'Transfer Learning kapalÄ±';
     }
     if (transferLearningTrained) {
-      return 'Model eğitildi ve aktif';
+      return 'Model eÄŸitildi ve aktif';
     }
     if (totalExperiments < 50) {
-      return 'Model eğitimi için $totalExperiments/50 deney mevcut';
+      return 'Model eÄŸitimi iÃ§in $totalExperiments/50 deney mevcut';
     }
-    return 'Model eğitiliyor...';
+    return 'Model eÄŸitiliyor...';
   }
 
-  // ✅ YENİ: Model durumu ikonu
+  // âœ… YENÄ°: Model durumu ikonu
   IconData getModelStatusIcon() {
     if (!transferLearningEnabled) {
       return Icons.cloud_off;
@@ -252,7 +252,7 @@ class ApiHealthStatus {
     return Icons.pending;
   }
 
-  // ✅ YENİ: Model durumu rengi
+  // âœ… YENÄ°: Model durumu rengi
   Color getModelStatusColor() {
     if (!transferLearningEnabled) {
       return Colors.grey;
@@ -264,7 +264,7 @@ class ApiHealthStatus {
   }
 }
 
-// İstatistikler
+// Ä°statistikler
 class MLStatistics {
   final int totalDataPoints;
   final int verifiedDataPoints;
@@ -293,19 +293,19 @@ class MLStatistics {
     );
   }
 
-  // ✅ YENİ: En popüler malzeme
+  // âœ… YENÄ°: En popÃ¼ler malzeme
   String? getMostPopularMaterial() {
     if (materials.isEmpty) return null;
     return materials.entries.reduce((a, b) => a.value > b.value ? a : b).key;
   }
 
-  // ✅ YENİ: En popüler makine
+  // âœ… YENÄ°: En popÃ¼ler makine
   String? getMostPopularMachine() {
     if (machines.isEmpty) return null;
     return machines.entries.reduce((a, b) => a.value > b.value ? a : b).key;
   }
 
-  // ✅ YENİ: Veri kalitesi yüzdesi
+  // âœ… YENÄ°: Veri kalitesi yÃ¼zdesi
   double getDataQualityPercentage() {
     if (totalDataPoints == 0) return 0.0;
     return (verifiedDataPoints / totalDataPoints) * 100;

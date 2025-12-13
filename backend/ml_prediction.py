@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ML Prediction Service - FIREBASE DATA DRIVEN
-Sadece Firebase'deki kullanıcı verilerini kullanır
+Sadece Firebase'deki kullanÄ±cÄ± verilerini kullanÄ±r
 Transfer Learning: Implicit similarity-based approach
 """
 
@@ -14,21 +14,21 @@ logger = logging.getLogger(__name__)
 
 class MLPredictionService:
     """
-    Firebase tabanlı tahmin servisi.
+    Firebase tabanlÄ± tahmin servisi.
     
-    Transfer Learning Yaklaşımı:
+    Transfer Learning YaklaÅŸÄ±mÄ±:
     1. Material similarity (benzer malzemeler)
-    2. Thickness proximity (yakın kalınlıklar)
-    3. Power adaptation (güç ölçekleme)
-    4. Quality weighting (kaliteli veri öncelik)
+    2. Thickness proximity (yakÄ±n kalÄ±nlÄ±klar)
+    3. Power adaptation (gÃ¼Ã§ Ã¶lÃ§ekleme)
+    4. Quality weighting (kaliteli veri Ã¶ncelik)
     
-    Bu implicit transfer learning yaklaşımıdır.
+    Bu implicit transfer learning yaklaÅŸÄ±mÄ±dÄ±r.
     """
     
     def __init__(self):
         self.min_data_points = 3
         self.quality_threshold = 5
-        self.power_tolerance = 10  # ±10W (küçültüldü, daha hassas)
+        self.power_tolerance = 10  # Â±10W (kÃ¼Ã§Ã¼ltÃ¼ldÃ¼, daha hassas)
         self.thickness_tolerance = 1.5
     
     def predict_from_data(
@@ -45,9 +45,9 @@ class MLPredictionService:
         Args:
             experiments: Firebase'den gelen benzer deneyler
             process_type: 'cutting', 'engraving', 'scoring'
-            material_type: Malzeme türü
-            thickness: Kalınlık (mm)
-            target_power: Hedef lazer gücü (W)
+            material_type: Malzeme tÃ¼rÃ¼
+            thickness: KalÄ±nlÄ±k (mm)
+            target_power: Hedef lazer gÃ¼cÃ¼ (W)
         
         Returns:
             (predictions_dict, confidence_score, notes_string)
@@ -59,9 +59,9 @@ class MLPredictionService:
         
         data_points = len(relevant_experiments)
         
-        # Yetersiz veri → None (static algorithm kullanılacak)
+        # Yetersiz veri â†’ None (static algorithm kullanÄ±lacak)
         if data_points < self.min_data_points:
-            logger.info(f"⚠️ Insufficient data: {data_points} experiments")
+            logger.info(f"âš ï¸ Insufficient data: {data_points} experiments")
             return None, 0.0, f"Yetersiz topluluk verisi ({data_points} deney)"
         
         # 2. Similarity scoring (TRANSFER LEARNING: similarity-based transfer)
@@ -117,7 +117,7 @@ class MLPredictionService:
         )
         
         logger.info(
-            f"✅ Prediction: {predictions['power']:.1f}%, {predictions['speed']:.0f}mm/s, "
+            f"âœ… Prediction: {predictions['power']:.1f}%, {predictions['speed']:.0f}mm/s, "
             f"{predictions['passes']} passes | confidence={confidence:.2f}"
         )
         
@@ -149,7 +149,7 @@ class MLPredictionService:
         TRANSFER LEARNING CORE: Similarity-based knowledge transfer.
         
         Her deneyin hedef parametrelere benzerlik skoru.
-        Bu skorlar, hangi deneylerden ne kadar bilgi transfer edileceğini belirler.
+        Bu skorlar, hangi deneylerden ne kadar bilgi transfer edileceÄŸini belirler.
         """
         scores = []
         
@@ -200,15 +200,15 @@ class MLPredictionService:
         exp_scores = np.exp(scores - np.max(scores))
         normalized = exp_scores / exp_scores.sum()
         
-        logger.debug(f"📊 Similarity scores: min={scores.min():.3f}, max={scores.max():.3f}")
+        logger.debug(f"ðŸ“Š Similarity scores: min={scores.min():.3f}, max={scores.max():.3f}")
         
         return normalized
     
     def _are_similar_materials(self, mat1: str, mat2: str) -> bool:
-        """Benzer malzeme grupları (transfer learning için)."""
-        wood_group = ['ahşap', 'ahsap', 'wood', 'mdf']
-        paper_group = ['kağıt', 'kagit', 'paper', 'karton', 'cardboard']
-        fabric_group = ['kumaş', 'kumas', 'fabric', 'keçe', 'felt']
+        """Benzer malzeme gruplarÄ± (transfer learning iÃ§in)."""
+        wood_group = ['ahÅŸap', 'ahsap', 'wood', 'mdf']
+        paper_group = ['kaÄŸÄ±t', 'kagit', 'paper', 'karton', 'cardboard']
+        fabric_group = ['kumaÅŸ', 'kumas', 'fabric', 'keÃ§e', 'felt']
         leather_group = ['deri', 'leather']
         
         for group in [wood_group, paper_group, fabric_group, leather_group]:
@@ -271,7 +271,7 @@ class MLPredictionService:
         elif power_ratio > 1.3:
             scaled_passes = max(1, scaled_passes - 1)
         
-        logger.info(f"⚖️ Power scaling: {source_power:.0f}W → {target_power:.0f}W")
+        logger.info(f"âš–ï¸ Power scaling: {source_power:.0f}W â†’ {target_power:.0f}W")
         
         return {
             'power': round(max(10, min(100, scaled_power)), 1),
@@ -338,18 +338,18 @@ class MLPredictionService:
         
         # Confidence
         if confidence >= 0.80:
-            parts.append("✅ Yüksek güvenilirlik")
+            parts.append("âœ… YÃ¼ksek gÃ¼venilirlik")
         elif confidence >= 0.65:
-            parts.append("ℹ️ Orta güvenilirlik")
+            parts.append("â„¹ï¸ Orta gÃ¼venilirlik")
         else:
-            parts.append("⚠️ Düşük güvenilirlik")
+            parts.append("âš ï¸ DÃ¼ÅŸÃ¼k gÃ¼venilirlik")
         
         # Data count
         parts.append(f"{data_points} benzer deney")
         
         # Scaling
         if was_scaled:
-            parts.append(f"🔧 {power_diff:.0f}W güç farkı ölçeklendirildi")
+            parts.append(f"ðŸ”§ {power_diff:.0f}W gÃ¼Ã§ farkÄ± Ã¶lÃ§eklendirildi")
         
         # Quality
         avg_quality = mean([
@@ -364,7 +364,7 @@ class MLPredictionService:
             if e.get('dataSource') in ['researcher', 'researcher_import']
         )
         if gold_count > 0:
-            parts.append(f"🌟 {gold_count} gold standard")
+            parts.append(f"ðŸŒŸ {gold_count} gold standard")
         
         return " | ".join(parts)
 
