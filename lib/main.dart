@@ -30,10 +30,10 @@ class LaserTunerApp extends StatelessWidget {
           seedColor: Colors.blue,
           brightness: Brightness.light,
         ),
-        cardTheme: CardTheme(
+        cardTheme: const CardThemeData(
           elevation: 2,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.all(Radius.circular(12)),
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
