@@ -144,77 +144,13 @@ class AppConfig {
 
   // ===== STANDART GÜÇ DEĞERLERİ (2-40W) =====
   static const List<double> STANDARD_POWER_VALUES = [
-    2.0,
-    3.0,
-    5.0,
-    7.0,
-    10.0,
-    15.0,
-    20.0,
-    25.0,
-    30.0,
-    33.0,
-    35.0,
-    40.0,
+    2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 25.0, 30.0, 33.0, 35.0, 40.0,
   ];
-static String getMaterialKeyFromDisplayName(String displayName) {
-    final normalized = displayName.toLowerCase().trim();
-    
-    // Tüm kategorilerde ara
-    for (var category in MATERIAL_CATEGORIES.values) {
-      for (var material in category) {
-        final materialName = (material['name'] as String).toLowerCase();
-        final materialKey = material['key'] as String;
-        
-        if (normalized == materialName || normalized == materialKey) {
-          return materialKey;
-        }
-      }
-    }
-    
-    // Bulunamazsa, normalize edilmiş versiyonu döndür
-    return _normalizeForBackend(normalized);
-  }
 
-  static String _normalizeForBackend(String text) {
-    return text
-        .toLowerCase()
-        .replaceAll('ş', 's')
-        .replaceAll('ç', 'c')
-        .replaceAll('ğ', 'g')
-        .replaceAll('ü', 'u')
-        .replaceAll('ö', 'o')
-        .replaceAll('ı', 'i')
-        .replaceAll(' ', '_')
-        .trim();
-  }
-
-  /// ✅ YENİ: Material key'den backend-safe key'e çevirme
-  static String getMaterialBackendKey(String materialKey) {
-    return _normalizeForBackend(materialKey);
-  }
-}
   // ===== KALINLIK DEĞERLERİ (1-10mm) =====
   static const List<double> THICKNESS_VALUES = [
-    1.0,
-    1.5,
-    2.0,
-    2.5,
-    3.0,
-    3.5,
-    4.0,
-    4.5,
-    5.0,
-    5.5,
-    6.0,
-    6.5,
-    7.0,
-    7.5,
-    8.0,
-    8.5,
-    9.0,
-    9.5,
-    10.0,
+    1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 5.5,
+    6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0,
   ];
 
   // ===== MALZEME KATEGORİLERİ =====
@@ -389,6 +325,40 @@ static String getMaterialKeyFromDisplayName(String displayName) {
 
   // ===== HELPER METHODS =====
 
+  static String getMaterialKeyFromDisplayName(String displayName) {
+    final normalized = displayName.toLowerCase().trim();
+    // Tüm kategorilerde ara
+    for (var category in MATERIAL_CATEGORIES.values) {
+      for (var material in category) {
+        final materialName = (material['name'] as String).toLowerCase();
+        final materialKey = material['key'] as String;
+        if (normalized == materialName || normalized == materialKey) {
+          return materialKey;
+        }
+      }
+    }
+    // Bulunamazsa, normalize edilmiş versiyonu döndür
+    return _normalizeForBackend(normalized);
+  }
+
+  static String _normalizeForBackend(String text) {
+    return text
+        .toLowerCase()
+        .replaceAll('ş', 's')
+        .replaceAll('ç', 'c')
+        .replaceAll('ğ', 'g')
+        .replaceAll('ü', 'u')
+        .replaceAll('ö', 'o')
+        .replaceAll('ı', 'i')
+        .replaceAll(' ', '_')
+        .trim();
+  }
+
+  /// ✅ YENİ: Material key'den backend-safe key'e çevirme
+  static String getMaterialBackendKey(String materialKey) {
+    return _normalizeForBackend(materialKey);
+  }
+
   /// Makine adından güç aralığını al
   static List<double> getPowerRangeForMachine(String machineName) {
     final machine = SUPPORTED_MACHINES.firstWhere(
@@ -527,7 +497,6 @@ static String getMaterialKeyFromDisplayName(String displayName) {
   static List<String> getRecommendedMaterialsForMachine(String machineName) {
     final maxThickness = getMaxThicknessForMachine(machineName);
     final allMaterials = getAllMaterials();
-
     return allMaterials
         .where((m) => (m['maxThickness'] ?? 10.0) <= maxThickness)
         .map((m) => m['key'] as String)
@@ -537,7 +506,6 @@ static String getMaterialKeyFromDisplayName(String displayName) {
   /// Malzeme için önerilen makineleri al
   static List<String> getRecommendedMachinesForMaterial(String materialKey) {
     final materialMaxThickness = getMaxThicknessForMaterial(materialKey);
-
     return SUPPORTED_MACHINES
         .where((m) => (m['maxThickness'] ?? 10.0) >= materialMaxThickness)
         .map((m) => m['name'] as String)
