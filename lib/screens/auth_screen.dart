@@ -21,7 +21,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   Future<void> _handleAuth() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      _showSnackBar('LÃ¼tfen tÃ¼m alanlarÄ± doldurun');
+      _showSnackBar('Lütfen tüm alanları doldurun');
       return;
     }
 
@@ -86,7 +86,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _isLogin ? 'GiriÅŸ Yap' : 'KayÄ±t Ol',
+                      _isLogin ? 'Giriş Yap' : 'Kayıt Ol',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 32),
@@ -102,7 +102,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     // Åžifre
                     CustomTextField(
                       controller: _passwordController,
-                      label: 'Åžifre',
+                      label: 'Şifre',
                       obscureText: true,
                     ),
                     const SizedBox(height: 24),
@@ -111,7 +111,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: CustomButton(
-                        text: _isLogin ? 'GiriÅŸ Yap' : 'KayÄ±t Ol',
+                        text: _isLogin ? 'Giriş Yap' : 'Kayıt Ol',
                         onPressed: _handleAuth,
                         isLoading: _isLoading,
                       ),
@@ -125,8 +125,8 @@ class _AuthScreenState extends State<AuthScreen> {
                       },
                       child: Text(
                         _isLogin
-                            ? 'HesabÄ±n yok mu? KayÄ±t ol'
-                            : 'Zaten hesabÄ±n var mÄ±? GiriÅŸ yap',
+                            ? 'Hesabın yok mu? Kayıt ol'
+                            : 'Zaten hesabın var mı? Giriş yap',
                       ),
                     ),
                   ],

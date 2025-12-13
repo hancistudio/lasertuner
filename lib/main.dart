@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:lasertuner/services/remote_config_service.dart';
 import 'firebase_options.dart';
 import 'screens/auth_screen.dart';
@@ -9,7 +10,7 @@ import 'services/auth_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Firebase baÅŸlatma
+  // Firebase başlatma
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await RemoteConfigService().initialize();
   runApp(const LaserTunerApp());
@@ -23,6 +24,16 @@ class LaserTunerApp extends StatelessWidget {
     return MaterialApp(
       title: 'LaserTuner',
       debugShowCheckedModeBanner: false,
+
+      // ✅ TÜRKÇE KARAKTER DÜZELTMESİ
+      locale: const Locale('tr', 'TR'),
+      supportedLocales: const [Locale('tr', 'TR'), Locale('en', 'US')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
@@ -56,7 +67,7 @@ class LaserTunerApp extends StatelessWidget {
   }
 }
 
-// Auth durumuna gÃ¶re yÃ¶nlendirme
+// Auth durumuna göre yönlendirme
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
