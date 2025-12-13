@@ -6,7 +6,7 @@ Ensures high-quality training data for transfer learning
 
 import logging
 import numpy as np
-from typing import List, Dict, Tuple
+from typing import List, Dict, Optional, Tuple
 from collections import Counter
 
 logger = logging.getLogger(__name__)
