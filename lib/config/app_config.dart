@@ -157,7 +157,43 @@ class AppConfig {
     35.0,
     40.0,
   ];
+static String getMaterialKeyFromDisplayName(String displayName) {
+    final normalized = displayName.toLowerCase().trim();
+    
+    // Tüm kategorilerde ara
+    for (var category in MATERIAL_CATEGORIES.values) {
+      for (var material in category) {
+        final materialName = (material['name'] as String).toLowerCase();
+        final materialKey = material['key'] as String;
+        
+        if (normalized == materialName || normalized == materialKey) {
+          return materialKey;
+        }
+      }
+    }
+    
+    // Bulunamazsa, normalize edilmiş versiyonu döndür
+    return _normalizeForBackend(normalized);
+  }
 
+  static String _normalizeForBackend(String text) {
+    return text
+        .toLowerCase()
+        .replaceAll('ş', 's')
+        .replaceAll('ç', 'c')
+        .replaceAll('ğ', 'g')
+        .replaceAll('ü', 'u')
+        .replaceAll('ö', 'o')
+        .replaceAll('ı', 'i')
+        .replaceAll(' ', '_')
+        .trim();
+  }
+
+  /// ✅ YENİ: Material key'den backend-safe key'e çevirme
+  static String getMaterialBackendKey(String materialKey) {
+    return _normalizeForBackend(materialKey);
+  }
+}
   // ===== KALINLIK DEĞERLERİ (1-10mm) =====
   static const List<double> THICKNESS_VALUES = [
     1.0,

@@ -139,59 +139,67 @@ class _AddDataScreenState extends State<AddDataScreen> {
     return true;
   }
 
-  Future<void> _submitData() async {
-    if (!_validateInputs()) return;
+ Future<void> _submitData() async {
+  if (!_validateInputs()) return;
 
-    setState(() => _isLoading = true);
+  setState(() => _isLoading = true);
 
-    try {
-      Map<String, ProcessParams> processes = {};
-      Map<String, int> qualityScores = {};
+  try {
+    Map<String, ProcessParams> processes = {};
+    Map<String, int> qualityScores = {};
 
-      _selectedProcesses.forEach((processType, isSelected) {
-        if (isSelected) {
-          final controllers = _processControllers[processType]!;
-          processes[processType] = ProcessParams(
-            power: double.parse(controllers['power']!.text),
-            speed: double.parse(controllers['speed']!.text),
-            passes: int.parse(controllers['passes']!.text),
-          );
-          qualityScores[processType] = _qualityScores[processType]!.toInt();
-        }
-      });
+    _selectedProcesses.forEach((processType, isSelected) {
+      if (isSelected) {
+        final controllers = _processControllers[processType]!;
+        processes[processType] = ProcessParams(
+          power: double.parse(controllers['power']!.text),
+          speed: double.parse(controllers['speed']!.text),
+          passes: int.parse(controllers['passes']!.text),
+        );
+        qualityScores[processType] = _qualityScores[processType]!.toInt();
+      }
+    });
 
-      ExperimentModel experiment = ExperimentModel(
-        id: '',
-        userId: widget.userId,
-        machineBrand: _selectedMachine!,
-        laserPower: _selectedPower!,
-        materialType: AppConfig.getMaterialDisplayName(_selectedMaterial!),
-        materialThickness: _selectedThickness!,
-        processes: processes,
-        photoUrl: '',
-        photoUrl2: '',
-        qualityScores: qualityScores,
-        dataSource: 'user',
-        verificationStatus: 'pending',
-        createdAt: DateTime.now(),
-      );
+    // ✅ Material display name'i backend-safe key'e çevir
+    final backendMaterialKey = AppConfig.getMaterialBackendKey(_selectedMaterial!);
+    final displayName = AppConfig.getMaterialDisplayName(_selectedMaterial!);
 
-      await _firestoreService.addExperiment(
-        experiment,
-        _selectedImageFile!,
-        imageFile2: _selectedImageFile2,
-      );
+    print('🔄 Material conversion:');
+    print('   Selected key: $_selectedMaterial');
+    print('   Display name: $displayName');
+    print('   Backend key: $backendMaterialKey');
 
-      _showSnackBar('✅ Veri başarıyla eklendi!');
+    ExperimentModel experiment = ExperimentModel(
+      id: '',
+      userId: widget.userId,
+      machineBrand: _selectedMachine!,
+      laserPower: _selectedPower!,
+      materialType: displayName, // ✅ Display name Firebase'e kaydedilir
+      materialThickness: _selectedThickness!,
+      processes: processes,
+      photoUrl: '',
+      photoUrl2: '',
+      qualityScores: qualityScores,
+      dataSource: 'user',
+      verificationStatus: 'pending',
+      createdAt: DateTime.now(),
+    );
 
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      _showSnackBar('❌ Hata: ${e.toString()}');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    await _firestoreService.addExperiment(
+      experiment,
+      _selectedImageFile!,
+      imageFile2: _selectedImageFile2,
+    );
+
+    _showSnackBar('✅ Veri başarıyla eklendi!');
+
+    if (mounted) Navigator.pop(context);
+  } catch (e) {
+    _showSnackBar('❌ Hata: ${e.toString()}');
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
   }
-
+}
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),

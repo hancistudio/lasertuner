@@ -93,10 +93,25 @@ class MLService {
   }
 
   /// Tahmin al
-  Future<PredictionResponse> getPrediction(PredictionRequest request) async {
+   Future<PredictionResponse> getPrediction(PredictionRequest request) async {
     try {
       print('📤 Sending prediction request to: $API_URL/predict');
-      print('📦 Request data: ${jsonEncode(request.toMap())}');
+      
+      // ✅ Material name'i backend-safe format'a çevir
+      final backendMaterial = AppConfig.getMaterialBackendKey(request.materialType);
+      
+      print('🔄 Material normalized: ${request.materialType} → $backendMaterial');
+      
+      // ✅ Request body'yi normalize edilmiş material ile oluştur
+      final requestBody = {
+        'machineBrand': request.machineBrand,
+        'laserPower': request.laserPower,
+        'materialType': backendMaterial, // ✅ Normalized version
+        'materialThickness': request.materialThickness,
+        'processes': request.processes,
+      };
+      
+      print('📦 Request data: ${jsonEncode(requestBody)}');
 
       final response = await http
           .post(
@@ -105,7 +120,7 @@ class MLService {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
             },
-            body: jsonEncode(request.toMap()),
+            body: jsonEncode(requestBody),
           )
           .timeout(
             requestTimeout,
@@ -127,7 +142,17 @@ class MLService {
         return PredictionResponse.fromMap(data);
       } else if (response.statusCode == 422) {
         final errorData = jsonDecode(response.body);
-        throw Exception('Geçersiz veri: ${errorData['detail']}');
+        
+        // ✅ Hata mesajını parse et
+        String errorMessage = 'Geçersiz veri';
+        if (errorData['detail'] is List) {
+          final errors = errorData['detail'] as List;
+          errorMessage = errors.map((e) => e['msg'] ?? e.toString()).join('\n');
+        } else if (errorData['detail'] is String) {
+          errorMessage = errorData['detail'];
+        }
+        
+        throw Exception('Validation Error: $errorMessage');
       } else if (response.statusCode == 500) {
         throw Exception('Sunucu hatası. Lütfen daha sonra tekrar deneyin.');
       } else {
@@ -230,15 +255,17 @@ class MLService {
     }
   }
 
-  /// Fallback: Basit tahmin (API çalışmazsa)
   PredictionResponse generateFallbackPrediction(PredictionRequest request) {
     print('⚠️ Using DIODE LASER fallback prediction algorithm');
 
     Map<String, ProcessParams> predictions = {};
     double thickness = request.materialThickness;
-    List<String> warnings = []; // ✅ YENİ: Warnings ekle
+    List<String> warnings = [];
 
-    // ✅ YENİ: Kalınlık uyarısı
+    // ✅ Material'i normalize et
+    final normalizedMaterial = AppConfig.getMaterialBackendKey(request.materialType);
+
+    // Kalınlık uyarısı
     if (thickness > 8) {
       warnings.add(
         '⚠️ ${thickness}mm kalınlık diode lazer için çok zorlu olabilir',
@@ -247,7 +274,7 @@ class MLService {
       warnings.add('⚠️ ${thickness}mm kalınlık için dikkatli yaklaşın');
     }
 
-    // ✅ YENİ: Güç uyarısı
+    // Güç uyarısı
     if (request.laserPower < 20 && thickness > 3) {
       warnings.add(
         '⚠️ ${request.laserPower}W güç, ${thickness}mm kalınlık için düşük olabilir',
@@ -260,28 +287,22 @@ class MLService {
       switch (processType) {
         case 'cutting':
           params = ProcessParams(
-            power: _calculateDiodeCuttingPower(request.materialType, thickness),
-            speed: _calculateDiodeCuttingSpeed(request.materialType, thickness),
+            power: _calculateDiodeCuttingPower(normalizedMaterial, thickness),
+            speed: _calculateDiodeCuttingSpeed(normalizedMaterial, thickness),
             passes: _calculateDiodePasses(thickness),
           );
           break;
         case 'engraving':
           params = ProcessParams(
-            power: _calculateDiodeEngravingPower(
-              request.materialType,
-              thickness,
-            ),
-            speed: _calculateDiodeEngravingSpeed(
-              request.materialType,
-              thickness,
-            ),
+            power: _calculateDiodeEngravingPower(normalizedMaterial, thickness),
+            speed: _calculateDiodeEngravingSpeed(normalizedMaterial, thickness),
             passes: 1,
           );
           break;
         case 'scoring':
           params = ProcessParams(
-            power: _calculateDiodeScoringPower(request.materialType, thickness),
-            speed: _calculateDiodeScoringSpeed(request.materialType, thickness),
+            power: _calculateDiodeScoringPower(normalizedMaterial, thickness),
+            speed: _calculateDiodeScoringSpeed(normalizedMaterial, thickness),
             passes: 1,
           );
           break;
@@ -299,8 +320,8 @@ class MLService {
           '⚠️ API bağlantısı kurulamadı, diode lazer algoritması kullanıldı. '
           'İnternet bağlantınızı kontrol edin.',
       dataPointsUsed: 0,
-      dataSource: 'fallback', // ✅ Değiştirildi: static_algorithm → fallback
-      warnings: warnings, // ✅ YENİ: Warnings ekle
+      dataSource: 'fallback',
+      warnings: warnings,
     );
   }
 

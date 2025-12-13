@@ -203,53 +203,61 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
 
     setState(() => _isLoading = true);
 
-    try {
-      Map<String, ProcessParams> processes = {};
-      Map<String, int> qualityScores = {};
+      try {
+    Map<String, ProcessParams> processes = {};
+    Map<String, int> qualityScores = {};
 
-      _selectedProcesses.forEach((processType, isSelected) {
-        if (isSelected) {
-          final controllers = _processControllers[processType]!;
-          processes[processType] = ProcessParams(
-            power: double.parse(controllers['power']!.text),
-            speed: double.parse(controllers['speed']!.text),
-            passes: int.parse(controllers['passes']!.text),
-          );
-          qualityScores[processType] = _qualityScores[processType]!.toInt();
-        }
-      });
+    _selectedProcesses.forEach((processType, isSelected) {
+      if (isSelected) {
+        final controllers = _processControllers[processType]!;
+        processes[processType] = ProcessParams(
+          power: double.parse(controllers['power']!.text),
+          speed: double.parse(controllers['speed']!.text),
+          passes: int.parse(controllers['passes']!.text),
+        );
+        qualityScores[processType] = _qualityScores[processType]!.toInt();
+      }
+    });
 
-      ExperimentModel experiment = ExperimentModel(
-        id: '',
-        userId: widget.userId,
-        machineBrand: _selectedMachine!, // ✅ Dropdown'dan
-        laserPower: _selectedPower!, // ✅ Chip'den
-        materialType: AppConfig.getMaterialDisplayName(
-          _selectedMaterial!,
-        ), // ✅ Display name
-        materialThickness: _selectedThickness!, // ✅ Chip'den
-        processes: processes,
-        photoUrl: '',
-        photoUrl2: '',
-        qualityScores: qualityScores,
-        dataSource: 'researcher',
-        verificationStatus: 'verified',
-        createdAt: DateTime.now(),
-      );
+    // ✅ Material display name'i backend-safe key'e çevir
+    final backendMaterialKey = AppConfig.getMaterialBackendKey(_selectedMaterial!);
+    final displayName = AppConfig.getMaterialDisplayName(_selectedMaterial!);
 
-      await _firestoreService.addExperiment(
-        experiment,
-        _selectedImageFile!,
-        imageFile2: _selectedImageFile2,
-      );
-      _showSnackBar('✅ Gold Standard veri başarıyla eklendi!');
-      _clearForm();
-    } catch (e) {
-      _showSnackBar('❌ Hata: ${e.toString()}');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    print('🔄 Researcher Material conversion:');
+    print('   Selected key: $_selectedMaterial');
+    print('   Display name: $displayName');
+    print('   Backend key: $backendMaterialKey');
+
+    ExperimentModel experiment = ExperimentModel(
+      id: '',
+      userId: widget.userId,
+      machineBrand: _selectedMachine!,
+      laserPower: _selectedPower!,
+      materialType: displayName, // ✅ Display name Firebase'e kaydedilir
+      materialThickness: _selectedThickness!,
+      processes: processes,
+      photoUrl: '',
+      photoUrl2: '',
+      qualityScores: qualityScores,
+      dataSource: 'researcher',
+      verificationStatus: 'verified',
+      createdAt: DateTime.now(),
+    );
+
+    await _firestoreService.addExperiment(
+      experiment,
+      _selectedImageFile!,
+      imageFile2: _selectedImageFile2,
+    );
+    
+    _showSnackBar('✅ Gold Standard veri başarıyla eklendi!');
+    _clearForm();
+  } catch (e) {
+    _showSnackBar('❌ Hata: ${e.toString()}');
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
   }
+}
 
   void _clearForm() {
     _processControllers.values.forEach(
