@@ -25,7 +25,7 @@ class LaserTunerApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        useMaterial3: true,
+        useMaterial3: false,
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.blue,
           brightness: Brightness.light,
