@@ -174,7 +174,7 @@ class MLPredictionService:
             power_score = np.exp(-power_diff / 10.0)  # Decay: 10W
             
             # 4. Quality score (0-1)
-            quality = exp.get('qualityScores', {}).get('cutting', 5)
+            quality = exp.get('qualityScores', {}).get(process_type, 7) 
             quality_score = quality / 10.0
             
             # 5. Approve boost
@@ -353,7 +353,7 @@ class MLPredictionService:
         
         # Quality
         avg_quality = mean([
-            e.get('qualityScores', {}).get(process_type, 5) 
+            e.get('qualityScores', {}).get(process_type, 7) 
             for e in experiments
         ])
         parts.append(f"Kalite: {avg_quality:.1f}/10")

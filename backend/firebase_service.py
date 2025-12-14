@@ -305,7 +305,7 @@ class FirebaseService:
                         'targetPasses': process_params.get('passes', 1),
                         
                         # Metadata
-                        'quality': quality_scores.get(process_type, 5),
+                        'quality': quality_scores.get(process_type, 7),  # 10 üzerinden 7 default
                         'dataSource': data.get('dataSource', 'user'),
                     }
                     

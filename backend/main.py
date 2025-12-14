@@ -474,14 +474,18 @@ async def fine_tune_model():
                 detail=f"Insufficient data for fine-tuning: {len(training_data)} samples (need 30+)"
             )
         
-        # 3. Encode data
         feature_encoder = get_feature_encoder()
-        X, y_power, y_speed, y_passes = feature_encoder.encode_batch(training_data)
+        X, y_power, y_speed, y_passes, sample_weights = feature_encoder.encode_batch(training_data)
         logger.info(f"✅ Encoded {len(X)} training samples")
+        logger.info(f"⚖️ Quality weights: min={sample_weights.min():.2f}, max={sample_weights.max():.2f}")
         
-        # 4. Fine-tune
+        # ✅ YENİ: Sample weights ile fine-tune
         logger.info("🔄 Fine-tuning model...")
-        history = transfer_model.fine_tune(X, y_power, y_speed, y_passes, epochs=50)
+        history = transfer_model.fine_tune(
+            X, y_power, y_speed, y_passes,
+            sample_weights=sample_weights,  # ✅ YENİ
+            epochs=50
+        )
         
         # 5. Save locally (temporary)
         local_model_path = "models/diode_laser_transfer_v1.h5"
@@ -550,10 +554,20 @@ async def train_from_scratch():
                 detail=f"Insufficient data for training: {len(training_data)} samples (need 30+)"
             )
         
-        # 2. Encode data
+        # ✅ YENİ: Sample weights ile encode
         feature_encoder = get_feature_encoder()
-        X, y_power, y_speed, y_passes = feature_encoder.encode_batch(training_data)
+        X, y_power, y_speed, y_passes, sample_weights = feature_encoder.encode_batch(training_data)
         logger.info(f"✅ Encoded {len(X)} training samples")
+        logger.info(f"⚖️ Quality weights: min={sample_weights.min():.2f}, max={sample_weights.max():.2f}")
+        
+        # ✅ YENİ: Sample weights ile train
+        logger.info("🔄 Training model from scratch...")
+        history = transfer_model.train(
+            X, y_power, y_speed, y_passes,
+            sample_weights=sample_weights,  # ✅ YENİ
+            epochs=100,
+            save_path=local_model_path
+        )
         
         # 3. Create new model
         logger.info("🆕 Creating fresh model architecture...")
@@ -762,12 +776,12 @@ async def startup_event():
         logger.error("❌ Firebase Storage not available")
     
     # ===== If no model in Firebase, create NEW and train =====
+    # ===== If no model in Firebase, create NEW and train =====
     if not model_loaded:
         logger.info("🆕 No model in Firebase Storage, creating fresh model...")
-        transfer_model = get_transfer_model()  # New untrained model
+        transfer_model = get_transfer_model()
         logger.info("✅ Fresh model architecture created (UNTRAINED)")
         
-        # Try to train immediately if data available
         if firebase.is_available():
             stats = firebase.get_statistics()
             verified_count = stats.get('verified_experiments', 0)
@@ -779,13 +793,19 @@ async def startup_event():
                     training_data = firebase.get_training_data_for_transfer_learning(limit=500)
                     
                     if len(training_data) >= 30:
-                        X, y_power, y_speed, y_passes = feature_encoder.encode_batch(training_data)
+                        # ✅ YENİ: Sample weights ile encode
+                        X, y_power, y_speed, y_passes, sample_weights = feature_encoder.encode_batch(training_data)
                         logger.info(f"   📊 Training with {len(X)} samples")
+                        logger.info(f"   ⚖️ Quality weights: min={sample_weights.min():.2f}, max={sample_weights.max():.2f}")
                         
-                        # Train from scratch
+                        # ✅ YENİ: Sample weights ile train
                         os.makedirs("models", exist_ok=True)
-                        transfer_model.train(X, y_power, y_speed, y_passes, 
-                                           epochs=100, save_path=local_model_path)
+                        transfer_model.train(
+                            X, y_power, y_speed, y_passes,
+                            sample_weights=sample_weights,  # ✅ YENİ
+                            epochs=100,
+                            save_path=local_model_path
+                        )
                         
                         logger.info("✅ Training completed")
                         
