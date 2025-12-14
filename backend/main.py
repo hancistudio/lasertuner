@@ -560,14 +560,6 @@ async def train_from_scratch():
         logger.info(f"✅ Encoded {len(X)} training samples")
         logger.info(f"⚖️ Quality weights: min={sample_weights.min():.2f}, max={sample_weights.max():.2f}")
         
-        # ✅ YENİ: Sample weights ile train
-        logger.info("🔄 Training model from scratch...")
-        history = transfer_model.train(
-            X, y_power, y_speed, y_passes,
-            sample_weights=sample_weights,  # ✅ YENİ
-            epochs=100,
-            save_path=local_model_path
-        )
         
         # 3. Create new model
         logger.info("🆕 Creating fresh model architecture...")

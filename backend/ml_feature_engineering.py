@@ -434,63 +434,63 @@ class MaterialFeatureEncoder:
         
         return features
     
-def encode_batch(self, firebase_data: list) -> tuple:
-    """
-    Birden fazla Firebase kaydını batch olarak encode et
-    Quality-weighted learning: Düşük kaliteli veriyi atlamak yerine ağırlıklandır
-    
-    Args:
-        firebase_data: List of dicts from get_training_data_for_transfer_learning()
-    
-    Returns:
-        (X, y_power, y_speed, y_passes, sample_weights)
-        X shape: (N, 9)
-        y_power shape: (N, 1)
-        y_speed shape: (N, 1)
-        y_passes shape: (N, 1)
-        sample_weights shape: (N,)  # ✅ YENİ: Quality weights
-    """
-    X = []
-    y_power = []
-    y_speed = []
-    y_passes = []
-    sample_weights = []  # ✅ YENİ
-    
-    for data in firebase_data:
-        try:
-            # Features encode et
-            features = self.encode(
-                material_type=data['materialType'],
-                thickness=data['materialThickness'],
-                laser_power=data['laserPower'],
-                process_type=data['processType']
-            )
-            X.append(features)
-            
-            # ✅ YENİ: Quality weight hesapla (1-10 → 0.1-1.0)
-            quality = data.get('quality', 5)
-            quality_weight = max(0.1, quality / 10.0)  # Minimum 0.1
-            sample_weights.append(quality_weight)
-            
-            # Targets (normalize to 0-1 for better training)
-            y_power.append(data['targetPower'] / 100.0)
-            y_speed.append(data['targetSpeed'] / 500.0)
-            y_passes.append(data['targetPasses'] / 20.0)
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Failed to encode sample: {e}")
-            continue
-    
-    if len(X) == 0:
-        raise ValueError("No valid samples to encode")
-    
-    return (
-        np.array(X, dtype=np.float32),
-        np.array(y_power, dtype=np.float32).reshape(-1, 1),
-        np.array(y_speed, dtype=np.float32).reshape(-1, 1),
-        np.array(y_passes, dtype=np.float32).reshape(-1, 1),
-        np.array(sample_weights, dtype=np.float32)  # ✅ YENİ
-    )
+    def encode_batch(self, firebase_data: list) -> tuple:
+        """
+        Birden fazla Firebase kaydını batch olarak encode et
+        Quality-weighted learning: Düşük kaliteli veriyi atlamak yerine ağırlıklandır
+        
+        Args:
+            firebase_data: List of dicts from get_training_data_for_transfer_learning()
+        
+        Returns:
+            (X, y_power, y_speed, y_passes, sample_weights)
+            X shape: (N, 9)
+            y_power shape: (N, 1)
+            y_speed shape: (N, 1)
+            y_passes shape: (N, 1)
+            sample_weights shape: (N,)  # ✅ YENİ: Quality weights
+        """
+        X = []
+        y_power = []
+        y_speed = []
+        y_passes = []
+        sample_weights = []  # ✅ YENİ
+        
+        for data in firebase_data:
+            try:
+                # Features encode et
+                features = self.encode(
+                    material_type=data['materialType'],
+                    thickness=data['materialThickness'],
+                    laser_power=data['laserPower'],
+                    process_type=data['processType']
+                )
+                X.append(features)
+                
+                # ✅ YENİ: Quality weight hesapla (1-10 → 0.1-1.0)
+                quality = data.get('quality', 5)
+                quality_weight = max(0.1, quality / 10.0)  # Minimum 0.1
+                sample_weights.append(quality_weight)
+                
+                # Targets (normalize to 0-1 for better training)
+                y_power.append(data['targetPower'] / 100.0)
+                y_speed.append(data['targetSpeed'] / 500.0)
+                y_passes.append(data['targetPasses'] / 20.0)
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to encode sample: {e}")
+                continue
+        
+        if len(X) == 0:
+            raise ValueError("No valid samples to encode")
+        
+        return (
+            np.array(X, dtype=np.float32),
+            np.array(y_power, dtype=np.float32).reshape(-1, 1),
+            np.array(y_speed, dtype=np.float32).reshape(-1, 1),
+            np.array(y_passes, dtype=np.float32).reshape(-1, 1),
+            np.array(sample_weights, dtype=np.float32)  # ✅ YENİ
+        )
     
     def decode_predictions(self, power_norm: float, speed_norm: float, 
                           passes_norm: float) -> dict:
