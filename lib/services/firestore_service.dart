@@ -19,6 +19,26 @@ class FirestoreService {
     XFile? imageFile2,
   }) async {
     try {
+      // ✅ Validasyon: Sadece pozitif değerler (0 ve negatif yasak)
+      for (var process in experiment.processes.entries) {
+        final params = process.value;
+        if (params.speed <= 0) {
+          throw Exception(
+            '${process.key} için hız 0\'dan büyük olmalı (girilen: ${params.speed})',
+          );
+        }
+        if (params.power <= 0) {
+          throw Exception(
+            '${process.key} için güç 0\'dan büyük olmalı (girilen: ${params.power})',
+          );
+        }
+        if (params.passes < 1) {
+          throw Exception(
+            '${process.key} için geçiş sayısı en az 1 olmalı (girilen: ${params.passes})',
+          );
+        }
+      }
+
       // 1. İlk fotoğrafı Storage'a yükle
       String imageUrl = await _uploadImage(imageFile, 'experiments');
 
@@ -344,8 +364,10 @@ class FirestoreService {
     }
   }
 
+  // ✅ GELİŞTİRİLMİŞ OYLAMA SİSTEMİ
   Future<void> _updateExperimentStatus(String experimentId) async {
     try {
+      // 1. Tüm oyları say
       final votes =
           await _firestore
               .collection('experiment_votes')
@@ -363,6 +385,9 @@ class FirestoreService {
         }
       }
 
+      final totalVotes = approveCount + rejectCount;
+
+      // 2. Experiment'i al
       final experimentDoc =
           await _firestore.collection('experiments').doc(experimentId).get();
       if (!experimentDoc.exists) return;
@@ -371,13 +396,40 @@ class FirestoreService {
       final currentStatus = experimentData['verificationStatus'] as String;
       final experimentUserId = experimentData['userId'] as String;
 
-      String newStatus = 'pending';
-      if (approveCount >= 5) {
-        newStatus = 'verified';
-      } else if (rejectCount >= 3) {
-        newStatus = 'rejected';
+      // ✅ SEÇENEk 1 (MODIFIYE): REJECTED OLAN VERIFIED OLAMAZ
+      // Rejected bir veri artık asla verified olamaz (kesin red)
+      // Ama verified bir veri rejected olabilir (topluluk değişikliği)
+      if (currentStatus == 'rejected') {
+        // Sadece oy sayılarını güncelle, rejected'dan dönüş yok
+        await _firestore.collection('experiments').doc(experimentId).update({
+          'approveCount': approveCount,
+          'rejectCount': rejectCount,
+        });
+        return; // Rejected kesin, değişmez
       }
 
+      // 3. ✅ YENİ KURALLAR (Pending ve Verified için)
+      String newStatus = 'pending';
+
+      // Kural 1: 5 onay = verified (geçici - red kontrolü yapılacak)
+      if (approveCount >= 5) {
+        newStatus = 'verified';
+      }
+
+      // Kural 2: Red sayısı toplam oyun %50'sini geçerse rejected
+      // Bu kural 5 onay olsa bile geçerli!
+      // Örnek: 5 onay + 6 red = 11 oy, %54.5 red → REJECTED
+      // Örnek: 5 onay + 5 red = 10 oy, %50 red → VERIFIED (eşitlik)
+      if (totalVotes >= 3 && rejectCount > 0) {
+        final rejectPercentage = (rejectCount / totalVotes) * 100;
+
+        // %50'den fazla red varsa rejected (5 onay olsa bile!)
+        if (rejectPercentage > 50.0) {
+          newStatus = 'rejected';
+        }
+      }
+
+      // 4. Status değiştiyse güncelle
       if (currentStatus != newStatus) {
         await _firestore.collection('experiments').doc(experimentId).update({
           'verificationStatus': newStatus,
@@ -385,13 +437,21 @@ class FirestoreService {
           'rejectCount': rejectCount,
         });
 
+        // 5. Reputation güncelle
         if (newStatus == 'verified' && currentStatus != 'verified') {
+          // Verified oldu → +10 puan
           await updateUserReputation(experimentUserId, 10);
         }
         if (currentStatus == 'verified' && newStatus != 'verified') {
+          // Verified'dan düştü → -10 puan
           await updateUserReputation(experimentUserId, -10);
         }
+        if (newStatus == 'rejected' && currentStatus != 'rejected') {
+          // Rejected oldu → -5 puan
+          await updateUserReputation(experimentUserId, -5);
+        }
       } else {
+        // Status değişmedi, sadece sayıları güncelle
         await _firestore.collection('experiments').doc(experimentId).update({
           'approveCount': approveCount,
           'rejectCount': rejectCount,

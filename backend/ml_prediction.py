@@ -244,10 +244,10 @@ class MLPredictionService:
                 break
         
         return {
-            'power': round(max(10, min(100, weighted_power)), 1),
-            'speed': round(max(50, min(500, weighted_speed)), 0),
-            'passes': max(1, min(20, median_passes))
-        }
+        'power': round(max(0.1, weighted_power), 1),  # Sadece > 0
+        'speed': round(max(0.1, weighted_speed), 0),  # Sadece > 0
+        'passes': max(1, median_passes)               # En az 1
+    }
     
     def _scale_by_power(
         self,
@@ -274,10 +274,10 @@ class MLPredictionService:
         logger.info(f"⚖️ Power scaling: {source_power:.0f}W → {target_power:.0f}W")
         
         return {
-            'power': round(max(10, min(100, scaled_power)), 1),
-            'speed': round(max(50, min(500, scaled_speed)), 0),
-            'passes': max(1, min(20, scaled_passes))
-        }
+        'power': round(max(0.1, scaled_power), 1),  # Sadece > 0
+        'speed': round(max(0.1, scaled_speed), 0),  # Sadece > 0
+        'passes': max(1, scaled_passes)             # En az 1
+    }
     
     def _calculate_confidence(
         self,

@@ -74,9 +74,9 @@ class ProcessParams(BaseModel):
 class PredictionRequest(BaseModel):
     """Request model for parameter prediction"""
     machineBrand: str = Field(..., min_length=1, max_length=100)
-    laserPower: float = Field(..., ge=2, le=40, description="Laser power in Watts (2-40W)")
+    laserPower: float = Field(..., gt=0, description="Laser power in Watts (must be > 0)")
     materialType: str = Field(..., min_length=1, max_length=50)
-    materialThickness: float = Field(..., gt=0, le=10, description="Thickness in mm (max 10mm for diode)")
+    materialThickness: float = Field(..., gt=0, description="Thickness in mm (must be > 0)")
     processes: List[str] = Field(..., min_items=1, max_items=3)
 
     @validator('processes')

@@ -9,7 +9,18 @@ class ProcessParams {
     required this.power,
     required this.speed,
     required this.passes,
-  });
+  }) {
+    // ✅ Sadece pozitif değerler
+    if (power <= 0) {
+      throw ArgumentError('Güç 0\'dan büyük olmalı (girilen: $power)');
+    }
+    if (speed <= 0) {
+      throw ArgumentError('Hız 0\'dan büyük olmalı (girilen: $speed)');
+    }
+    if (passes < 1) {
+      throw ArgumentError('Geçiş sayısı en az 1 olmalı (girilen: $passes)');
+    }
+  }
 
   Map<String, dynamic> toMap() {
     return {'power': power, 'speed': speed, 'passes': passes};

@@ -668,7 +668,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
                           controller: controllers['speed']!,
                           decoration: InputDecoration(
                             labelText: 'Hız (mm/s)',
-                            hintText: '50-500',
+                            hintText: '0-500',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
