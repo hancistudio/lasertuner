@@ -7,7 +7,7 @@ class GeminiAIService {
   // 🔑 Google AI Studio'dan alacağınız API Key
   // https://makersuite.google.com/app/apikey
   static const String GEMINI_API_KEY =
-      'AIzaSyDq2c-QZO6j2v4KbQW1YI1IAQzgu4BO1A0';
+      'AIzaSyAaA7TGR5sGaX93RTHOJsQ4SuJDoLhFnJ4';
 
   late final GenerativeModel _model;
 
@@ -15,7 +15,7 @@ class GeminiAIService {
     // ✅ Güncel model adını kullan - Gemini 2.0 Flash
     // NOT: gemini-1.5-flash artık kullanımdan kaldırıldı
     _model = GenerativeModel(
-      model: 'gemini-1.5-flash', // Experimental - en yeni özellikler
+      model: 'gemini-2.0-flash-exp', // Experimental - en yeni özellikler
       // model: 'gemini-1.5-pro', // Alternatif: Daha güçlü ama yavaş
       apiKey: GEMINI_API_KEY,
       generationConfig: GenerationConfig(
