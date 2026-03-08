@@ -15,7 +15,7 @@ class GeminiAIService {
     // ✅ Güncel model adını kullan - Gemini 2.0 Flash
     // NOT: gemini-1.5-flash artık kullanımdan kaldırıldı
     _model = GenerativeModel(
-      model: 'gemini-2.0-flash-exp', // Experimental - en yeni özellikler
+      model: 'gemini-2.0-flash', // Experimental - en yeni özellikler
       // model: 'gemini-1.5-pro', // Alternatif: Daha güçlü ama yavaş
       apiKey: GEMINI_API_KEY,
       generationConfig: GenerationConfig(
@@ -26,7 +26,7 @@ class GeminiAIService {
       ),
     );
 
-    print('✅ Gemini model initialized: gemini-2.0-flash-exp');
+    print('✅ Gemini model initialized: gemini-2.0-flash');
   }
 
   /// Gemini ile tahmin al
