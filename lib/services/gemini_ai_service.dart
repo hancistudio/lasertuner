@@ -7,7 +7,7 @@ class GeminiAIService {
   // 🔑 Google AI Studio'dan alacağınız API Key
   // https://makersuite.google.com/app/apikey
   static const String GEMINI_API_KEY =
-      'AIzaSyAaA7TGR5sGaX93RTHOJsQ4SuJDoLhFnJ4';
+      'AIzaSyAmIRa5FwzBmB3_NQypoRtYSZBH_h9k8zI';
 
   late final GenerativeModel _model;
 
