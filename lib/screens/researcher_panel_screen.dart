@@ -252,14 +252,15 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
   }
 
   void _clearForm() {
-    _processControllers.values.forEach(
-      (c) => c.values.forEach((ctrl) {
-        if (ctrl == c['passes'])
+    for (var c in _processControllers.values) {
+      c.values.forEach((ctrl) {
+        if (ctrl == c['passes']) {
           ctrl.text = '1';
-        else
+        } else {
           ctrl.clear();
-      }),
-    );
+        }
+      });
+    }
     setState(() {
       _selectedMachine = null;
       _selectedPower = null;
@@ -635,7 +636,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                   const SizedBox(height: 8),
                 ],
               );
-            }).toList(),
+            }),
 
             if (_selectedMaterial != null) ...[
               const Divider(),
@@ -1012,9 +1013,9 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
 
   @override
   void dispose() {
-    _processControllers.values.forEach(
-      (c) => c.values.forEach((ctrl) => ctrl.dispose()),
-    );
+    for (var c in _processControllers.values) {
+      c.values.forEach((ctrl) => ctrl.dispose());
+    }
     super.dispose();
   }
 }
@@ -1044,8 +1045,9 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
         setState(() => _fileName = result.files.single.name);
         if (kIsWeb) {
           final bytes = result.files.single.bytes;
-          if (bytes != null)
+          if (bytes != null) {
             _parseFile(bytes, result.files.single.extension ?? '');
+          }
         } else {
           final file = File(result.files.single.path!);
           final bytes = await file.readAsBytes();
@@ -1062,12 +1064,13 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
       String content = utf8.decode(bytes);
       if (extension == 'json') {
         final jsonData = jsonDecode(content);
-        if (jsonData is List)
+        if (jsonData is List) {
           setState(
             () => _parsedData = List<Map<String, dynamic>>.from(jsonData),
           );
-        else
+        } else {
           setState(() => _parsedData = [Map<String, dynamic>.from(jsonData)]);
+        }
         _showSnackBar('${_parsedData!.length} kayıt bulundu');
       } else if (extension == 'csv') {
         List<String> lines = content.split('\n');
@@ -1080,8 +1083,9 @@ class _ExternalDataTabState extends State<_ExternalDataTab> {
             List<String> values =
                 lines[i].split(',').map((e) => e.trim()).toList();
             Map<String, dynamic> row = {};
-            for (int j = 0; j < headers.length && j < values.length; j++)
+            for (int j = 0; j < headers.length && j < values.length; j++) {
               row[headers[j]] = values[j];
+            }
             data.add(row);
           }
           setState(() => _parsedData = data);
@@ -1394,8 +1398,9 @@ class _ResearcherDataCardState extends State<_ResearcherDataCard> {
     final isImported = exp.dataSource == 'researcher_import';
 
     final photos = <String>[];
-    if (exp.photoUrl.isNotEmpty && !exp.photoUrl.contains('placeholder'))
+    if (exp.photoUrl.isNotEmpty && !exp.photoUrl.contains('placeholder')) {
       photos.add(exp.photoUrl);
+    }
     if (exp.photoUrl2.isNotEmpty) photos.add(exp.photoUrl2);
 
     return Card(
@@ -1724,7 +1729,7 @@ class _ResearcherDataCardState extends State<_ResearcherDataCard> {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
                 ],
 
                 const SizedBox(height: 8),

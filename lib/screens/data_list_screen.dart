@@ -523,7 +523,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
             ),
           ),
           if (widget.experiment.photoUrl.isNotEmpty)
-            Container(
+            SizedBox(
               height: isLargeScreen ? 300 : 200,
               child: Builder(
                 builder: (context) {
@@ -604,7 +604,7 @@ class _ExperimentCardState extends State<_ExperimentCard> {
                       isDark: isDark,
                       isLarge: isLargeScreen,
                     );
-                  }).toList(),
+                  }),
                 ],
 
                 // Genişlet/Daralt butonu

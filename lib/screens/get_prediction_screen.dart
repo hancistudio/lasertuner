@@ -879,7 +879,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
                   const SizedBox(height: 12),
                 ],
               );
-            }).toList(),
+            }),
 
             if (_selectedMaterial != null) ...[
               const Divider(),
@@ -1659,7 +1659,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               ),
               _buildParamBadge(
                 'Hız',
-                '${params.speed.toStringAsFixed(0)}',
+                params.speed.toStringAsFixed(0),
                 color,
                 Icons.speed,
               ),

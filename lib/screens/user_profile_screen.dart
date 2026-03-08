@@ -761,7 +761,7 @@ class _DetailedExperimentCardState extends State<_DetailedExperimentCard> {
                         ],
                       ),
                     );
-                  }).toList(),
+                  }),
 
                   // Oylama bilgisi
                   if (exp.approveCount > 0 || exp.rejectCount > 0)

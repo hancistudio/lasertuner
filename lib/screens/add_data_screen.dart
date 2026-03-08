@@ -480,7 +480,7 @@ class _AddDataScreenState extends State<AddDataScreen> {
                   const SizedBox(height: 8),
                 ],
               );
-            }).toList(),
+            }),
 
             if (_selectedMaterial != null) ...[
               const Divider(),
@@ -934,9 +934,9 @@ class _AddDataScreenState extends State<AddDataScreen> {
 
   @override
   void dispose() {
-    _processControllers.values.forEach(
-      (c) => c.values.forEach((ctrl) => ctrl.dispose()),
-    );
+    for (var c in _processControllers.values) {
+      c.values.forEach((ctrl) => ctrl.dispose());
+    }
     super.dispose();
   }
 }

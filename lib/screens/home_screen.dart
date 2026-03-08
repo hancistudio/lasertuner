@@ -9,7 +9,7 @@ import 'user_profile_screen.dart';
 import 'auth_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -164,8 +164,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _validateAndEnter(String password) {
-    const String ADMIN_PASSWORD = 'laser2025';
-    if (password == ADMIN_PASSWORD) {
+    const String adminPassword = 'laser2025';
+    if (password == adminPassword) {
       Navigator.pop(context);
       Navigator.push(
         context,
