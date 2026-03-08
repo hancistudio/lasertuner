@@ -6,6 +6,7 @@ import '../models/experiment_model.dart';
 class GeminiAIService {
   // 🔑 Google AI Studio'dan alacağınız API Key
   // https://makersuite.google.com/app/apikey
+  // ignore: constant_identifier_names
   static const String GEMINI_API_KEY =
       'AIzaSyDPoVhSAgqF9M7zZ1Pquc1uz5aGdiI-3Oc';
 
@@ -15,8 +16,7 @@ class GeminiAIService {
     // ✅ Güncel model adını kullan - Gemini 2.0 Flash
     // NOT: gemini-1.5-flash artık kullanımdan kaldırıldı
     _model = GenerativeModel(
-      model: 'gemini-2.0-flash', // Experimental - en yeni özellikler
-      // model: 'gemini-1.5-pro', // Alternatif: Daha güçlü ama yavaş
+      model: 'gemini-2.5-flash',
       apiKey: GEMINI_API_KEY,
       generationConfig: GenerationConfig(
         temperature: 0.7,
