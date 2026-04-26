@@ -1659,7 +1659,7 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               ),
               _buildParamBadge(
                 'Hız',
-                params.speed.toStringAsFixed(0),
+                '${params.speed.toStringAsFixed(0)} mm/s',
                 color,
                 Icons.speed,
               ),

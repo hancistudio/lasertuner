@@ -78,7 +78,7 @@ Sen bir diode lazer kesim uzmanısın. Aşağıdaki parametrelere göre en uygun
 🎯 GÖREV:
 Her işlem için aşağıdaki değerleri hesapla:
 1. power: Lazer gücü yüzdesi (0-100%)
-2. speed: Kesim hızı (mm/dakika, 50-500 arası)
+2. speed: Kesim hızı (mm/s, 1-500 arası)
 3. passes: Geçiş sayısı (1-8 arası)
 
 📊 ÖNEMLİ KURALLAR:

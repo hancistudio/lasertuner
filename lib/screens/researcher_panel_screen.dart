@@ -253,13 +253,13 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
 
   void _clearForm() {
     for (var c in _processControllers.values) {
-      c.values.forEach((ctrl) {
+      for (var ctrl in c.values) {
         if (ctrl == c['passes']) {
           ctrl.text = '1';
         } else {
           ctrl.clear();
         }
-      });
+      }
     }
     setState(() {
       _selectedMachine = null;
@@ -796,7 +796,7 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
                                   _processControllers[processType]!['speed']!,
                               decoration: InputDecoration(
                                 labelText: 'Hız (mm/s)',
-                                hintText: '50-500',
+                                hintText: '1-500',
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -1014,7 +1014,9 @@ class _ExperimentDataTabState extends State<_ExperimentDataTab> {
   @override
   void dispose() {
     for (var c in _processControllers.values) {
-      c.values.forEach((ctrl) => ctrl.dispose());
+      for (var ctrl in c.values) {
+        ctrl.dispose();
+      }
     }
     super.dispose();
   }

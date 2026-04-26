@@ -67,7 +67,7 @@ app.add_middleware(
 class ProcessParams(BaseModel):
     """Process parameters for diode laser operations"""
     power: float = Field(..., ge=5, le=100, description="Power percentage (5-100%)")
-    speed: float = Field(..., ge=50, le=500, description="Speed in mm/min")
+    speed: float = Field(..., ge=1, le=500, description="Speed in mm/sec")
     passes: int = Field(..., ge=1, le=20, description="Number of passes")
 
 

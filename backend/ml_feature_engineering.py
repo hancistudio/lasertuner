@@ -507,7 +507,7 @@ class MaterialFeatureEncoder:
         """
         return {
             'power': np.clip(power_norm * 100.0, 10, 100),
-            'speed': np.clip(speed_norm * 500.0, 50, 500),
+            'speed': np.clip(speed_norm * 500.0, 1, 500),
             'passes': int(np.clip(round(passes_norm * 20.0), 1, 20))
         }
 

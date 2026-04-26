@@ -245,7 +245,7 @@ class MLPredictionService:
         
         return {
         'power': round(max(0.1, weighted_power), 1),  # Sadece > 0
-        'speed': round(max(0.1, weighted_speed), 0),  # Sadece > 0
+        'speed': round(max(1, weighted_speed), 0),  # Sadece > 0
         'passes': max(1, median_passes)               # En az 1
     }
     
