@@ -4,7 +4,8 @@ class RemoteConfigService {
   static final RemoteConfigService _instance = RemoteConfigService._internal();
   factory RemoteConfigService() => _instance;
   RemoteConfigService._internal();
-
+String get geminiApiKey =>
+      _remoteConfig.getString('AIzaSyDh-ugGZSrSf1UwYKD9dGq5PoViNnwciu0');
   late FirebaseRemoteConfig _remoteConfig;
   bool _initialized = false;
 

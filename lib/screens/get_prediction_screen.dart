@@ -1413,8 +1413,11 @@ class _GetPredictionScreenState extends State<GetPredictionScreen>
               ),
               const SizedBox(height: 24),
 
-              _buildConfidenceIndicator(result, accentColor, isMobile),
-              const SizedBox(height: 24),
+              if (result.dataSource != 'gemini_ai' &&
+                  result.dataSource != 'fallback') ...[
+                _buildConfidenceIndicator(result, accentColor, isMobile),
+                const SizedBox(height: 24),
+],
               if (result.hasWarnings()) ...[
                 Container(
                   padding: const EdgeInsets.all(16),

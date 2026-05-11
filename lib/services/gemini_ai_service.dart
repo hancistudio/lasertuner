@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:lasertuner/services/remote_config_service.dart';
 import '../models/prediction_model.dart';
 import '../models/experiment_model.dart';
 
@@ -7,8 +8,7 @@ class GeminiAIService {
   // 🔑 Google AI Studio'dan alacağınız API Key
   // https://makersuite.google.com/app/apikey
   // ignore: constant_identifier_names
-  static const String GEMINI_API_KEY =
-      'AIzaSyDPoVhSAgqF9M7zZ1Pquc1uz5aGdiI-3Oc';
+  final String _apiKey = RemoteConfigService().geminiApiKey;
 
   late final GenerativeModel _model;
 
@@ -17,7 +17,7 @@ class GeminiAIService {
     // NOT: gemini-1.5-flash artık kullanımdan kaldırıldı
     _model = GenerativeModel(
       model: 'gemini-2.5-flash',
-      apiKey: GEMINI_API_KEY,
+      apiKey: _apiKey,
       generationConfig: GenerationConfig(
         temperature: 0.7,
         topK: 40,
