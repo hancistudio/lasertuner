@@ -5,19 +5,15 @@ import '../models/prediction_model.dart';
 import '../models/experiment_model.dart';
 
 class GeminiAIService {
-  // 🔑 Google AI Studio'dan alacağınız API Key
-  // https://makersuite.google.com/app/apikey
-  // ignore: constant_identifier_names
-  final String _apiKey = RemoteConfigService().geminiApiKey;
+  // _model lazy oluşturuluyor: tahmin anında Remote Config zaten fetch etmiş olur
+  GenerativeModel? _model;
 
-  late final GenerativeModel _model;
-
-  GeminiAIService() {
-    // ✅ Güncel model adını kullan - Gemini 2.0 Flash
-    // NOT: gemini-1.5-flash artık kullanımdan kaldırıldı
+  GenerativeModel _getModel() {
+    final apiKey = RemoteConfigService().geminiApiKey;
+    // Her seferinde güncel key ile model oluştur (key değişirse güncellenir)
     _model = GenerativeModel(
       model: 'gemini-2.5-flash',
-      apiKey: _apiKey,
+      apiKey: apiKey,
       generationConfig: GenerationConfig(
         temperature: 0.7,
         topK: 40,
@@ -25,8 +21,10 @@ class GeminiAIService {
         maxOutputTokens: 2048,
       ),
     );
-
-    print('✅ Gemini model initialized: gemini-2.0-flash');
+    print(
+      '✅ Gemini model initialized: gemini-2.0-flash (key length: ${apiKey.length})',
+    );
+    return _model!;
   }
 
   /// Gemini ile tahmin al
@@ -39,11 +37,9 @@ class GeminiAIService {
         '📋 Request: ${request.machineBrand}, ${request.materialType}, ${request.materialThickness}mm',
       );
 
-      // Prompt oluştur
+      final model = _getModel();
       final prompt = _buildPrompt(request);
-
-      // Gemini'ye sor
-      final response = await _model.generateContent([Content.text(prompt)]);
+      final response = await model.generateContent([Content.text(prompt)]);
 
       if (response.text == null || response.text!.isEmpty) {
         throw Exception('Gemini boş yanıt verdi');
@@ -51,14 +47,10 @@ class GeminiAIService {
 
       print('✅ Gemini yanıtı alındı (${response.text!.length} karakter)');
 
-      // JSON'u parse et
       final jsonResponse = _parseGeminiResponse(response.text!);
-
-      // PredictionResponse'a dönüştür
       return _convertToPredictionResponse(jsonResponse, request);
     } catch (e) {
       print('❌ Gemini hatası: $e');
-      // Fallback: Basit varsayılan değerler döndür
       return _generateFallbackPrediction(request);
     }
   }
@@ -110,7 +102,6 @@ Yanıtın sadece JSON olsun!
     try {
       print('🔍 Parsing response...');
 
-      // Markdown kod bloklarını temizle
       String cleanedText =
           responseText
               .replaceAll('```json', '')
@@ -118,7 +109,6 @@ Yanıtın sadece JSON olsun!
               .replaceAll('json', '')
               .trim();
 
-      // JSON başlangıç ve bitişini bul
       final jsonStart = cleanedText.indexOf('{');
       final jsonEnd = cleanedText.lastIndexOf('}') + 1;
 
@@ -165,7 +155,6 @@ Yanıtın sadece JSON olsun!
       }
     }
 
-    // Eğer hiç prediction yoksa, fallback kullan
     if (predictions.isEmpty) {
       print('⚠️ No predictions found, using fallback');
       return _generateFallbackPrediction(request);
@@ -187,24 +176,23 @@ Yanıtın sadece JSON olsun!
     Map<String, ProcessParams> predictions = {};
     double thickness = request.materialThickness;
 
-    // Basit kurallara göre tahmin
     for (var processType in request.processes) {
       if (processType == 'cutting') {
         predictions['cutting'] = ProcessParams(
-          power: 80.0 + (thickness * 2), // Kalınlığa göre güç artır
-          speed: 250.0 - (thickness * 30), // Kalınlığa göre hız azalt
-          passes: (thickness / 2).ceil().clamp(1, 5), // Her 2mm için 1 geçiş
+          power: (80.0 + (thickness * 2)).clamp(10, 100),
+          speed: (250.0 - (thickness * 30)).clamp(50, 500),
+          passes: (thickness / 2).ceil().clamp(1, 5),
         );
       } else if (processType == 'engraving') {
         predictions['engraving'] = ProcessParams(
-          power: 40.0 + (thickness * 1.5),
-          speed: 400.0 - (thickness * 20),
+          power: (40.0 + (thickness * 1.5)).clamp(10, 100),
+          speed: (400.0 - (thickness * 20)).clamp(50, 500),
           passes: 1,
         );
       } else if (processType == 'scoring') {
         predictions['scoring'] = ProcessParams(
-          power: 55.0 + (thickness * 1.8),
-          speed: 300.0 - (thickness * 25),
+          power: (55.0 + (thickness * 1.8)).clamp(10, 100),
+          speed: (300.0 - (thickness * 25)).clamp(50, 500),
           passes: 1,
         );
       }
@@ -226,7 +214,6 @@ Yanıtın sadece JSON olsun!
     Future<PredictionResponse> Function(PredictionRequest) apiPrediction,
   ) async {
     try {
-      // Paralel olarak her iki tahmini al
       final results = await Future.wait([
         apiPrediction(request).catchError((e) {
           print('⚠️ API error in comparison: $e');
@@ -252,12 +239,13 @@ Yanıtın sadece JSON olsun!
     double thickness,
   ) async {
     try {
+      final model = _getModel();
       final prompt = '''
 $machineBrand diode lazer ile $thickness mm kalınlığında $material kesmeyi planlıyorum.
 Bana kısa ve öz tavsiyelerde bulun (Türkçe, maksimum 100 kelime).
 ''';
 
-      final response = await _model.generateContent([Content.text(prompt)]);
+      final response = await model.generateContent([Content.text(prompt)]);
       return response.text ?? 'Tavsiye alınamadı';
     } catch (e) {
       print('❌ Advice error: $e');
