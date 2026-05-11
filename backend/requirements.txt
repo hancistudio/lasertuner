@@ -20,3 +20,4 @@ tensorflow-cpu==2.15.0
 
 # Protobuf compatibility fix
 protobuf==4.23.4
+google-generativeai==0.8.3

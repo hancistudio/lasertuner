@@ -7,3 +7,5 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
+      - key: GEMINI_API_KEY   # ← BU SATIRI EKLE
+        sync: false 

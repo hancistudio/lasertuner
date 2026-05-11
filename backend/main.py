@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field, validator
 from typing import List, Dict, Optional
 import logging
 import os
+import json
+import re
 import numpy as np
 from datetime import datetime
 from dotenv import load_dotenv
@@ -25,6 +27,9 @@ from dotenv import load_dotenv
 # Import our services
 from firebase_service import get_firebase_service
 from model_storage_service import get_storage_service
+
+# ✅ YENİ: Gemini import
+import google.generativeai as genai
 
 # Load environment variables
 load_dotenv()
@@ -137,6 +142,15 @@ class HealthResponse(BaseModel):
     timestamp: str
     firebase_status: str = "unknown"
     total_experiments: int = 0
+
+
+# ✅ YENİ: Gemini request model
+class GeminiRequest(BaseModel):
+    machineBrand: str
+    materialType: str
+    materialThickness: float
+    laserPower: float
+    processes: List[str]
 
 
 # ============= DIODE LASER PARAMETERS =============
@@ -290,7 +304,6 @@ async def predict(request: PredictionRequest):
                 logger.info("🤖 Using trained transfer learning model...")
                 
                 for process_type in request.processes:
-                    # Encode features (9 numerical features)
                     features = feature_encoder.encode(
                         material_type=request.materialType,
                         thickness=request.materialThickness,
@@ -298,11 +311,9 @@ async def predict(request: PredictionRequest):
                         process_type=process_type
                     )
                     
-                    # Predict (normalized 0-1 outputs)
                     X = features.reshape(1, -1)
                     power_norm, speed_norm, passes_norm = transfer_model.predict(X)
                     
-                    # Denormalize predictions
                     pred = feature_encoder.decode_predictions(
                         power_norm[0][0],
                         speed_norm[0][0],
@@ -419,6 +430,83 @@ async def test_endpoint():
     }
 
 
+# ============= GEMINI AI ENDPOINT =============
+
+@app.post("/gemini-advice")
+async def get_gemini_advice(request: GeminiRequest):
+    """
+    🤖 Gemini AI ile lazer parametresi tahmini
+    API key sunucu tarafında güvenle saklanır, istemciye hiç ulaşmaz.
+    """
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        logger.error("❌ GEMINI_API_KEY environment variable not set")
+        raise HTTPException(status_code=503, detail="Gemini API key yapılandırılmamış")
+
+    try:
+        logger.info(f"🤖 Gemini isteği: {request.machineBrand}, {request.materialType}, {request.materialThickness}mm")
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+
+        processes_str = ", ".join(request.processes)
+
+        # Hangi işlemler isteniyor? Sadece onları örnek JSON'a ekle
+        process_examples = {}
+        if "cutting" in request.processes:
+            process_examples["cutting"] = {"power": 85.0, "speed": 200.0, "passes": 3}
+        if "engraving" in request.processes:
+            process_examples["engraving"] = {"power": 45.0, "speed": 350.0, "passes": 1}
+        if "scoring" in request.processes:
+            process_examples["scoring"] = {"power": 60.0, "speed": 280.0, "passes": 1}
+
+        prompt = f"""Sen bir diode lazer kesim uzmanısın. Aşağıdaki parametreler için en uygun lazer ayarlarını JSON formatında öner.
+
+📋 GİRİLEN PARAMETRELER:
+- Makine: {request.machineBrand}
+- Lazer Gücü: {request.laserPower}W (Diode Laser)
+- Malzeme: {request.materialType}
+- Kalınlık: {request.materialThickness}mm
+- İşlemler: {processes_str}
+
+📊 ÖNEMLİ KURALLAR:
+- Diode lazerler CO2'ye göre daha zayıftır
+- Kesme için yüksek güç (70-90%), kazıma için orta güç (40-60%)
+- Kalın malzemeler için daha fazla geçiş gerekir
+- power: 0-100 arası yüzde, speed: 1-500 mm/s, passes: 1-20 arası
+
+SADECE JSON döndür, başka hiçbir şey yazma:
+{{
+  "predictions": {json.dumps(process_examples, ensure_ascii=False)},
+  "confidence_score": 0.85,
+  "notes": "{request.materialThickness}mm {request.materialType} için önerilen ayarlar."
+}}
+
+Sadece istenen işlemler için tahmin yap: {processes_str}"""
+
+        response = model.generate_content(prompt)
+        text = response.text
+
+        # JSON bloğunu temizle
+        text = re.sub(r'```json|```', '', text).strip()
+        json_match = re.search(r'\{.*\}', text, re.DOTALL)
+        if not json_match:
+            raise ValueError("Gemini yanıtında JSON bulunamadı")
+
+        result = json.loads(json_match.group())
+        logger.info(f"✅ Gemini yanıtı başarılı: {list(result.get('predictions', {}).keys())}")
+        return result
+
+    except json.JSONDecodeError as e:
+        logger.error(f"❌ Gemini JSON parse hatası: {e}")
+        raise HTTPException(status_code=500, detail="Gemini geçersiz JSON döndürdü")
+    except Exception as e:
+        logger.error(f"❌ Gemini hatası: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============= ADMIN ENDPOINTS =============
+
 @app.get("/admin/storage-debug")
 async def storage_debug():
     """Firebase Storage debug bilgisi"""
@@ -437,13 +525,6 @@ async def storage_debug():
 async def fine_tune_model():
     """
     Admin endpoint: Fine-tune model with latest Firebase data
-    
-    Flow:
-    1. Use current model in memory (from Firebase)
-    2. Fine-tune with new data
-    3. Upload updated model back to Firebase
-    
-    Usage: POST /admin/fine-tune
     """
     global transfer_model
     
@@ -460,11 +541,9 @@ async def fine_tune_model():
         raise HTTPException(status_code=503, detail="Firebase Storage not available")
     
     try:
-        # 1. Ensure we have latest model
         if not transfer_model or not transfer_model.is_trained:
             raise HTTPException(status_code=400, detail="No trained model available. Train first.")
         
-        # 2. Get training data
         logger.info("📊 Fetching training data...")
         training_data = firebase.get_training_data_for_transfer_learning(limit=500)
         
@@ -479,27 +558,23 @@ async def fine_tune_model():
         logger.info(f"✅ Encoded {len(X)} training samples")
         logger.info(f"⚖️ Quality weights: min={sample_weights.min():.2f}, max={sample_weights.max():.2f}")
         
-        # ✅ YENİ: Sample weights ile fine-tune
         logger.info("🔄 Fine-tuning model...")
         history = transfer_model.fine_tune(
             X, y_power, y_speed, y_passes,
-            sample_weights=sample_weights,  # ✅ YENİ
+            sample_weights=sample_weights,
             epochs=50
         )
         
-        # 5. Save locally (temporary)
         local_model_path = "models/diode_laser_transfer_v1.h5"
         os.makedirs("models", exist_ok=True)
         transfer_model.save_model(local_model_path)
         
-        # 6. Upload to Firebase (CRITICAL)
         logger.info("📤 Uploading fine-tuned model to Firebase Storage...")
         success = storage_service.save_model_to_storage(local_model_path)
         
         if not success:
             raise HTTPException(status_code=500, detail="Failed to upload to Firebase Storage")
         
-        # 7. Get metadata
         metadata = storage_service.get_model_metadata()
         
         logger.info("✅ Fine-tuning complete and uploaded to Firebase")
@@ -524,10 +599,6 @@ async def fine_tune_model():
 async def train_from_scratch():
     """
     Admin endpoint: Train completely new model and upload to Firebase
-    
-    WARNING: This replaces the existing model in Firebase Storage
-    
-    Usage: POST /admin/train-from-scratch
     """
     global transfer_model
     
@@ -544,7 +615,6 @@ async def train_from_scratch():
         raise HTTPException(status_code=503, detail="Firebase Storage not available")
     
     try:
-        # 1. Get training data
         logger.info("📊 Fetching training data...")
         training_data = firebase.get_training_data_for_transfer_learning(limit=500)
         
@@ -554,18 +624,14 @@ async def train_from_scratch():
                 detail=f"Insufficient data for training: {len(training_data)} samples (need 30+)"
             )
         
-        # ✅ YENİ: Sample weights ile encode
         feature_encoder = get_feature_encoder()
         X, y_power, y_speed, y_passes, sample_weights = feature_encoder.encode_batch(training_data)
         logger.info(f"✅ Encoded {len(X)} training samples")
         logger.info(f"⚖️ Quality weights: min={sample_weights.min():.2f}, max={sample_weights.max():.2f}")
         
-        
-        # 3. Create new model
         logger.info("🆕 Creating fresh model architecture...")
         transfer_model = get_transfer_model()
         
-        # 4. Train from scratch
         local_model_path = "models/diode_laser_transfer_v1.h5"
         os.makedirs("models", exist_ok=True)
         
@@ -576,14 +642,12 @@ async def train_from_scratch():
             save_path=local_model_path
         )
         
-        # 5. Upload to Firebase (CRITICAL)
         logger.info("📤 Uploading trained model to Firebase Storage...")
         success = storage_service.save_model_to_storage(local_model_path)
         
         if not success:
             raise HTTPException(status_code=500, detail="Failed to upload to Firebase Storage")
         
-        # 6. Get metadata
         metadata = storage_service.get_model_metadata()
         
         logger.info("✅ Training complete and uploaded to Firebase")
@@ -608,10 +672,6 @@ async def train_from_scratch():
 async def reload_model_from_firebase():
     """
     Admin endpoint: Force reload model from Firebase Storage
-    
-    Useful when another server instance uploaded a new model
-    
-    Usage: POST /admin/reload-model-from-firebase
     """
     global transfer_model
     
@@ -626,18 +686,15 @@ async def reload_model_from_firebase():
     try:
         local_model_path = "models/diode_laser_transfer_v1.h5"
         
-        # Download from Firebase Storage
         logger.info("📥 Downloading model from Firebase Storage...")
         success = storage_service.load_model_from_storage(local_model_path)
         
         if not success:
             raise HTTPException(status_code=404, detail="Model not found in Firebase Storage")
         
-        # Load the model
         logger.info("🔄 Loading model into memory...")
         transfer_model = get_transfer_model(local_model_path)
         
-        # Get metadata
         metadata = storage_service.get_model_metadata()
         
         logger.info("✅ Model reloaded from Firebase Storage")
@@ -661,9 +718,6 @@ async def reload_model_from_firebase():
 async def reset_model():
     """
     DANGER: Delete model from Firebase Storage
-    Next restart will create fresh model
-    
-    Usage: POST /admin/reset-model
     """
     storage_service = get_storage_service()
     
@@ -693,13 +747,6 @@ async def reset_model():
 async def startup_event():
     """
     🚀 FIREBASE-FIRST MODEL STRATEGY
-    
-    Steps:
-    1. Initialize feature encoder
-    2. Connect to Firebase (Firestore + Storage)
-    3. Try to load model from Firebase Storage (ONLY SOURCE)
-    4. If not in Firebase, create new + train + upload
-    5. Never use local files as source of truth
     """
     global transfer_model, feature_encoder
     
@@ -708,6 +755,13 @@ async def startup_event():
     logger.info("🎯 Model Source: Firebase Storage ONLY (no local fallback)")
     logger.info("="*80)
     logger.info(f"🤖 TensorFlow Available: {TF_AVAILABLE}")
+
+    # ✅ YENİ: Gemini key kontrolü
+    gemini_key = os.getenv("GEMINI_API_KEY", "")
+    if gemini_key:
+        logger.info(f"✅ Gemini API key loaded (length: {len(gemini_key)})")
+    else:
+        logger.warning("⚠️ GEMINI_API_KEY not set — /gemini-advice endpoint will return 503")
     
     # 1. Initialize feature encoder
     try:
@@ -742,20 +796,17 @@ async def startup_event():
     local_model_path = "models/diode_laser_transfer_v1.h5"
     model_loaded = False
     
-    # ===== ONLY SOURCE: Firebase Storage =====
     if storage_service.is_available():
         logger.info("🔍 Checking Firebase Storage for model...")
         
         if storage_service.model_exists_in_storage():
             logger.info("📦 Model found in Firebase Storage, downloading...")
             
-            # Download to temp location
             if storage_service.load_model_from_storage(local_model_path):
                 transfer_model = get_transfer_model(local_model_path)
                 model_loaded = True
                 logger.info("✅ Model loaded from Firebase Storage")
                 
-                # Show metadata
                 metadata = storage_service.get_model_metadata()
                 if metadata:
                     logger.info(f"   📊 Size: {metadata['size_mb']:.2f} MB")
@@ -767,8 +818,6 @@ async def startup_event():
     else:
         logger.error("❌ Firebase Storage not available")
     
-    # ===== If no model in Firebase, create NEW and train =====
-    # ===== If no model in Firebase, create NEW and train =====
     if not model_loaded:
         logger.info("🆕 No model in Firebase Storage, creating fresh model...")
         transfer_model = get_transfer_model()
@@ -785,23 +834,20 @@ async def startup_event():
                     training_data = firebase.get_training_data_for_transfer_learning(limit=500)
                     
                     if len(training_data) >= 30:
-                        # ✅ YENİ: Sample weights ile encode
                         X, y_power, y_speed, y_passes, sample_weights = feature_encoder.encode_batch(training_data)
                         logger.info(f"   📊 Training with {len(X)} samples")
                         logger.info(f"   ⚖️ Quality weights: min={sample_weights.min():.2f}, max={sample_weights.max():.2f}")
                         
-                        # ✅ YENİ: Sample weights ile train
                         os.makedirs("models", exist_ok=True)
                         transfer_model.train(
                             X, y_power, y_speed, y_passes,
-                            sample_weights=sample_weights,  # ✅ YENİ
+                            sample_weights=sample_weights,
                             epochs=100,
                             save_path=local_model_path
                         )
                         
                         logger.info("✅ Training completed")
                         
-                        # UPLOAD TO FIREBASE (PRIMARY STORAGE)
                         if storage_service.is_available():
                             logger.info("📤 Uploading trained model to Firebase Storage...")
                             
