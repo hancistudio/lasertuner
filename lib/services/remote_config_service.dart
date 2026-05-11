@@ -4,8 +4,7 @@ class RemoteConfigService {
   static final RemoteConfigService _instance = RemoteConfigService._internal();
   factory RemoteConfigService() => _instance;
   RemoteConfigService._internal();
-String get geminiApiKey =>
-      _remoteConfig.getString('AIzaSyDh-ugGZSrSf1UwYKD9dGq5PoViNnwciu0');
+
   late FirebaseRemoteConfig _remoteConfig;
   bool _initialized = false;
 
@@ -24,7 +23,7 @@ String get geminiApiKey =>
     // Default değerler
     await _remoteConfig.setDefaults({
       'admin_password': 'laser2025',
-      'ml_api_url': 'http://localhost:8000',
+      'ml_api_url': 'http://localhost:8080',
       'max_image_size_mb': 5,
     });
 
@@ -40,4 +39,8 @@ String get geminiApiKey =>
   String get adminPassword => _remoteConfig.getString('admin_password');
   String get mlApiUrl => _remoteConfig.getString('ml_api_url');
   int get maxImageSizeMb => _remoteConfig.getInt('max_image_size_mb');
+
+  // NOT: Gemini API key artık burada değil.
+  // Key güvenli şekilde Render.com backend'inde environment variable olarak saklanıyor.
+  // Flutter → backend (/gemini-advice) → Gemini API
 }
